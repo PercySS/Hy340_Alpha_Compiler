@@ -1,7 +1,7 @@
 /*
     csd4676 Dimitrios Makrogiannis
     csd4621 Katerina Gyparaki
-    csd5141 Kallia Samaritaki
+    csd5140 Kallia Samaritaki
 
     This is the lexical analyzer for the compiler. We will use cpp to implement the lexical analyzer.
 */
@@ -12,6 +12,7 @@
 
 Alpha       [a-zA-Z]
 Digit       [0-9]
+Identifiers {Alpha}({Alpha}{Digit}_)*
 WhiteSpace  [ \t\n]
 LineEnd     \n
 
@@ -20,7 +21,11 @@ LineEnd     \n
 %{
     #include <iostream>
     #include <stack>
-    #include <queue
+    #include <string>
+    #include <queue>
+    #include <vector>
+    #include <stdio.h>
+    #include <stdlib.h>
     #include <string>
     extern YYSTYPE yylval;
     extern FILE *yyin;
@@ -109,11 +114,18 @@ LineEnd     \n
     /* Identifiers */   
 {Alpha}({Alpha}|{Digit})* { return ID; }
     
-        /* Constants */
+    /* Constants */
 {Digit}+                                { return INTCONST; }
 {Digit}+"."{Digit}*                     { return FLOATCONST; }
 {Digit}+"."{Digit}*[eE][+-]?{Digit}+    { return FLOATCONST; }
 {Digit}+"."{Digit}+                     { return REALCONST; }
+
+    /* WhiteSpaces */
+{WhiteSpace}+   {} 
+{LineEnd}       { return EOL; }
+
+    /* Comments */
+
 
 
 %%
