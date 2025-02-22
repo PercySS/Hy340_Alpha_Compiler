@@ -1,14 +1,7 @@
-/*
-    csd4676 Dimitrios Makrogiannis
-    csd4621 Katerina Gyparaki
-    csd5140 Kallia Samaritaki
-
-    This is the lexical analyzer for the compiler. We will use cpp to implement the lexical analyzer.
-*/
-
 /* Declarations  section */
 
 %option noyywrap
+%option nounput yylineno
 
 Alpha       [a-zA-Z]
 Digit       [0-9]
@@ -19,21 +12,8 @@ LineEnd     \n
 
 
 %{
-    #include <iostream>
-    #include <stack>
-    #include <string>
-    #include <queue>
-    #include <vector>
-    #include <stdio.h>
-    #include <stdlib.h>
-    #include <string>
-    extern YYSTYPE yylval;
-    extern FILE *yyin;
-    int yyerrror(char *s);
-
-
-    using namespace std;
-
+    
+#include "al.hpp"
 
 }%
 
@@ -44,13 +24,22 @@ LineEnd     \n
 "else"      { return ELSE; }
 "while"     { return WHILE; }
 "for"       { return FOR; }
+"function"  { return FUNCTION; }
 "return"    { return RETURN; }
+"break"     { return BREAK; }
+"continue"  { return CONTINUE; }
+"true"      { return TRUE; }
+"false"     { return FALSE; }
+"nil"       { return NIL; }
+"local"     { return LOCAL; }
+"global"    { return GLOBAL; }
+"and"       { return AND; }
+"not"       { return NOT; }
+"or"        { return OR; }
 "int"       { return INT; }
 "void"      { return VOID; }
 "char"      { return CHAR; }
 "main"      { return MAIN; }
-"break"     { return BREAK; }
-"continue"  { return CONTINUE; }
 "switch"    { return SWITCH; }
 "case"      { return CASE; }
 "default"   { return DEFAULT; }
@@ -64,8 +53,6 @@ LineEnd     \n
 "const"     { return CONST; }
 "static"    { return STATIC; }
 "extern"    { return EXTERN; }
-"register"  { return REGISTER; }
-"auto"      { return AUTO; }
 "typedef"   { return TYPEDEF; }
 "struct"    { return STRUCT; }
 "union"     { return UNION; }
@@ -87,9 +74,6 @@ LineEnd     \n
 "<="        { return LE; }
 ">"         { return GT; }
 ">="        { return GE; }
-"&&"        { return AND; }
-"||"        { return OR; }
-"!"         { return NOT; }
 "++"        { return INC; }
 "--"        { return DEC; }
 "+="        { return PLUSEQ; }
@@ -108,16 +92,17 @@ LineEnd     \n
 ";"         { return SEMICOLON; }
 ","         { return COMMA; }
 ":"         { return COLON; }
+"::"        { return SCOPE; }
+"->"        { return ARROW; }
 "."         { return DOT; }
+".."        { return DOTDOT; }
 "?"         { return TURNARY; }
 
     /* Identifiers */   
-{Alpha}({Alpha}|{Digit})* { return ID; }
+{Alpha}({Alpha}|{Digit}|_)* { return ID; }
     
     /* Constants */
-{Digit}+                                { return INTCONST; }
-{Digit}+"."{Digit}*                     { return FLOATCONST; }
-{Digit}+"."{Digit}*[eE][+-]?{Digit}+    { return FLOATCONST; }
+{Digit}*                                { return INTCONST; }
 {Digit}+"."{Digit}+                     { return REALCONST; }
 
     /* WhiteSpaces */
@@ -125,6 +110,15 @@ LineEnd     \n
 {LineEnd}       { return EOL; }
 
     /* Comments */
+"//"            { return LINECOMMENT; }
+"/*"            { return STARTBLOCKCOMMENT; }
+"*/"            { return ENDBLOCKCOMMENT; }
+
+    /* Strings */
+\"[^"]*\"       { return STRING; }
+
+    /* Error */
+.               { return UNEXPECTED; }
 
 
 
