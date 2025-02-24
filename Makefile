@@ -1,34 +1,25 @@
-# makefile for alpha compiler
-# Compiler  
-CXX = g++
-LEX = flex
+# Compiler and flags
+CXX = g++ 
 
-# Compiler flags  
-CXXFLAGS = 
+# Input and output files
+LEX_FILE = scanner.l
+HEADER_FILE = al.hpp
+HEADER2_FILE = scanner.hpp
+IMPL_FILE = al.cpp
+OUTPUT_FILE = scanner.o
+SCAN_FILE = scanner.cpp
 
-# Source files  
-SRCS = al.cpp lex.yy.cpp  
-OBJS = $(SRCS:.cpp=.o)  
+# Targets
+all: $(OUTPUT_FILE)
 
-# Output executable  
-TARGET = alpha_compiler  
+$(OUTPUT_FILE): $(SCAN_FILE) $(IMPL_FILE)
+	$(CXX) -o $(OUTPUT_FILE) $(SCAN_FILE) $(IMPL_FILE) -lfl
+	@echo "Generated scanner"
 
-# Default rule  
-all: $(TARGET)
+$(SCAN_FILE): $(LEX_FILE)
+	flex --outfile=$(SCAN_FILE) $(LEX_FILE)
+	@echo "Generated scanner.cpp"
 
-# Generate scanner from Flex file  
-lex.yy.cpp: scanner.l  
-	$(LEX) scanner.l  
-
-# Linking  
-$(TARGET): $(OBJS)  
-	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJS)
-
-# Compiling source files into object files  
-%.o: %.cpp  
-	$(CXX) $(CXXFLAGS) -c $< -o $@  
-
-# Clean up  
-clean:  
-	rm -f $(OBJS) $(TARGET) 
-	rm -f lex.yy.cpp
+clean:
+	rm -f $(OUTPUT_FILE) $(SCAN_FILE) $(HEADER2_FILE)
+	@echo "Cleaned"

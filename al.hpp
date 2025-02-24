@@ -1,41 +1,78 @@
+#ifndef AL_HPP
+#define AL_HPP
+
 #include <iostream>
-#include <stack>
 #include <string>
-#include <queue>
-#include <vector>
+#include <sstream>
+#include <cctype>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string>
+#include <queue>
+#include <fstream>
 
 
 using namespace std;
 
-// External Vars from lex.yy.c
-extern int yylex();
-extern int yylineno;
-extern char* yytext;
 
-int tokCount = 0; // Ascending token counter
-
-
-// Token structure
-enum TokenType {
-    UNEXPECTED = -1,
-    INTCONST = 0,
-    REALCONST = 1,
+typedef enum TokenType {
+    INTCONST,
+    REALCONST,
     STRING,
-    COMMENTLINE,
-    STARTBLOCKCOMMENT,
-    ENDBLOCKCOMMENT,
+    IDENTIFIER,
+    KEYWORD,
+    OPERATOR,
+    LEFT_BRACE,
+    RIGHT_BRACE,
+    LEFT_BRACKET,
+    RIGHT_BRACKET,
+    LEFT_PARENTHESIS,
+    RIGHT_PARENTHESIS,
+    SEMICOLON,
+    COMMA,
+    COLON,
+    DOUBLE_COLON,
+    ARROW,
+    SCOPE,
+    DOT,
+    DOTDOT,
+    TURNARY,
+    COMMENT
+} TokenType;
 
-};
+typedef struct alpha_token {
+    int line;
+    int numToken;
+    string content;
+    TokenType type;
+    string tokUpp;
+    string instance;
+} alpha_token_t;
 
-// Token structure
-struct alpha_token_t {
-    unsigned int     numline;
-    unsigned int     numToken;
-    char          *content;
-    char          *type;
-    struct alpha_token_t *alpha_yylex;
-  
-};
+// external variables 
+extern int line;
+extern int tokenNum;
+extern int incomment;
+extern int instring;
+extern queue<alpha_token_t*> tokenQueue;
+extern char* yytext;
+extern int yylineno;
+extern FILE* yyin;
+
+
+
+
+// Methods to be used in the driver program
+string toUpper(string str);
+
+string intToString(int num);
+
+string enumToString(enum TokenType type);
+
+void printQueue();
+
+void enqueueToken(alpha_token_t* token);
+
+alpha_token_t* alpha_yylex();
+
+
+#endif // AL_HPP
