@@ -1,25 +1,42 @@
 # Compiler and flags
-CXX = g++ 
+CXX = g++
+CXXFLAGS = -Wall -ansi -pedantic -g
+FLEX = flex
 
-# Input and output files
-LEX_FILE = scanner.l
-HEADER_FILE = al.hpp
-HEADER2_FILE = scanner.hpp
-IMPL_FILE = al.cpp
-OUTPUT_FILE = scanner.o
-SCAN_FILE = scanner.cpp
+# Directories
+SRC_DIR = src
+OUT_DIR = out
+
+# Files
+LEX_FILE = $(SRC_DIR)/scanner.l
+SCANNER_CPP = $(OUT_DIR)/scanner.cpp
+SCANNER_OBJ = $(OUT_DIR)/scanner.o
+AL_CPP = $(SRC_DIR)/al.cpp
+AL_OBJ = $(OUT_DIR)/al.o
+HEADER = $(SRC_DIR)/al.hpp
+EXEC = $(OUT_DIR)/scanner
 
 # Targets
-all: $(OUTPUT_FILE)
+all: $(EXEC)
 
-$(OUTPUT_FILE): $(SCAN_FILE) $(IMPL_FILE)
-	$(CXX) -o $(OUTPUT_FILE) $(SCAN_FILE) $(IMPL_FILE) -lfl
-	@echo "Generated scanner"
+# Generate scanner.cpp from scanner.l
+$(SCANNER_CPP): $(LEX_FILE)
+	@mkdir -p $(OUT_DIR)
+	$(FLEX) --outfile=$(SCANNER_CPP) $(LEX_FILE)
 
-$(SCAN_FILE): $(LEX_FILE)
-	flex --outfile=$(SCAN_FILE) $(LEX_FILE)
-	@echo "Generated scanner.cpp"
+# Compile scanner.cpp
+$(SCANNER_OBJ): $(SCANNER_CPP) $(HEADER)
+	$(CXX) $(CXXFLAGS) -c $(SCANNER_CPP) -o $(SCANNER_OBJ)
 
+# Compile al.cpp
+$(AL_OBJ): $(AL_CPP) $(HEADER)
+	$(CXX) $(CXXFLAGS) -c $(AL_CPP) -o $(AL_OBJ)
+
+# Link everything into the final executable
+$(EXEC): $(SCANNER_OBJ) $(AL_OBJ) 
+	$(CXX) $(CXXFLAGS) $(SCANNER_OBJ) $(AL_OBJ) $(HEADER) -o $(EXEC)
+
+# Clean compiled files
 clean:
-	rm -f $(OUTPUT_FILE) $(SCAN_FILE) $(HEADER2_FILE)
-	@echo "Cleaned"
+	rm -rf $(OUT_DIR)/*.o $(OUT_DIR)/scanner.cpp $(EXEC)
+	rmdir $(OUT_DIR) 2> /dev/null || true
