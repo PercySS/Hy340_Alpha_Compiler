@@ -25,7 +25,11 @@ typedef enum TokenType {
     KEYWORD,
     OPERATOR,
     PUNCTUATION,
-    COMMENT
+    COMMENT,
+    NL,
+    WS,
+    ERROR_COMMENT,
+    ERROR_STRING
 } TokenType;
 
 typedef struct alpha_token {

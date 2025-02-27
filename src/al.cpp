@@ -1,11 +1,10 @@
 #include "al.hpp"
 
 int tokenNum = 1;
-int line = 1;
-int incomment = 0;
+int inmlcomment = 0;
+int inslcomment = 0;
 int instring = 0;
 queue<alpha_token_t*> tokenQueue;
-void* token;
 
 // external
 extern char* yytext;
@@ -14,6 +13,7 @@ extern FILE* yyin;
 extern FILE* yyout;
 extern int yylex();
 extern void* token;
+
 
 
 string toUpper(string str) {
@@ -49,6 +49,10 @@ string enumToString(enum TokenType type) {
             return "PUNCTUATION";
         case END:
             return "END";
+        case NL:
+            return "NL";
+        case WS:
+            return "WS";
         default:
             return "UNEXPECTED";
     }
