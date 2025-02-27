@@ -1,19 +1,12 @@
 #include "al.hpp"
 
 int tokenNum = 1;
-int inmlcomment = 0;
-int inslcomment = 0;
-int instring = 0;
 queue<alpha_token_t*> tokenQueue;
 
-// external
-extern char* yytext;
-extern int yylineno;
+// external variables
 extern FILE* yyin;
 extern FILE* yyout;
 extern int yylex();
-extern void* token;
-
 
 
 string toUpper(string str) {
@@ -83,6 +76,16 @@ void enqueueToken(alpha_token_t* token) {
 int alpha_yylex(void* token) {
     int res = yylex();
     return res;
+}
+
+void illegal_comment(int line) {
+    fprintf(yyout, "Error: Comment not closed at line %d\n", line);
+    exit(1);
+}
+
+void illegal_string(int line) {
+    fprintf(yyout, "Error: String not closed at line %d\n", line);
+    exit(1);
 }
 
 int main(int argc, char* argv[]) {

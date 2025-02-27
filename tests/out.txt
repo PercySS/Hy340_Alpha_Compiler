@@ -1,0 +1,51 @@
++--------+--------+-------------------+-----------------+---------------------+----------------+
+|                                      LEXICAL ANALYSIS REPORT                                 |
++--------+--------+-------------------+-----------------+---------------------+----------------+
+| Line   | Num    | Content           | Type            | Uppercase           | Instance       |
++--------+--------+-------------------+-----------------+---------------------+----------------+
+| 1      | 1      | " "               | COMMENT         | SL_COMMENT          | enumerated     |
+| 2      | 2      | if                | KEYWORD         | IF                  | enumerated     |
+| 2      | 3      | if                | KEYWORD         | IF                  | enumerated     |
+| 2      | 4      | ifif              | IDENTIFIER      | ifif                | char*          |
+| 3      | 5      | ontws             | IDENTIFIER      | ontws               | char*          |
+| 4      | 6      | kjghdjkf          | IDENTIFIER      | kjghdjkf            | char*          |
+| 4      | 7      | +=                | OPERATOR        | PLUS_ASSIGN         | enumerated     |
+| 4      | 8      | (                 | PUNCTUATION     | LEFT_PARENTHESIS    | enumerated     |
+| 4      | 9      | )                 | PUNCTUATION     | RIGHT_PARENTHESIS   | enumerated     |
+| 4      | 10     | .                 | PUNCTUATION     | DOT                 | enumerated     |
+| 4      | 11     | ,                 | PUNCTUATION     | COMMA               | enumerated     |
+| 5      | 12     | ++                | OPERATOR        | INCREMENT           | enumerated     |
+| 5      | 13     | ++                | OPERATOR        | INCREMENT           | enumerated     |
+| 5      | 14     | +                 | OPERATOR        | PLUS                | enumerated     |
+| 6      | 15     | ->                | PUNCTUATION     | ARROW               | enumerated     |
+| 7      | 16     | h                 | IDENTIFIER      | h                   | char*          |
+| 7      | 17     | mana              | IDENTIFIER      | mana                | char*          |
+| 7      | 18     | sou               | IDENTIFIER      | sou                 | char*          |
+| 9      | 19     | (                 | PUNCTUATION     | LEFT_PARENTHESIS    | enumerated     |
+| 9      | 20     | se                | IDENTIFIER      | se                  | char*          |
+| 9      | 21     | gamaw             | IDENTIFIER      | gamaw               | char*          |
+| 9      | 22     | )                 | PUNCTUATION     | RIGHT_PARENTHESIS   | enumerated     |
+| 11     | 23     | 333               | INTCONST        | 333                 | integer        |
+| 11     | 24     | 3.78787           | REALCONST       | 3.78787             | float          |
+| 11     | 25     | .                 | PUNCTUATION     | DOT                 | enumerated     |
+| 11     | 26     | 454               | INTCONST        | 454                 | integer        |
+| 11     | 27     | 456               | INTCONST        | 456                 | integer        |
+| 11     | 28     | .                 | PUNCTUATION     | DOT                 | enumerated     |
+| 12     | 29     | if                | KEYWORD         | IF                  | enumerated     |
+| 12     | 30     | {                 | PUNCTUATION     | LEFT_BRACE          | enumerated     |
+| 12     | 31     | segamaw           | IDENTIFIER      | segamaw             | char*          |
+| 12     | 32     | }                 | PUNCTUATION     | RIGHT_BRACE         | enumerated     |
+| 12     | 33     | then              | IDENTIFIER      | then                | char*          |
+| 13     | 34     | {                 | PUNCTUATION     | LEFT_BRACE          | enumerated     |
+| 14     | 35     | miaxa             | IDENTIFIER      | miaxa               | char*          |
+| 14     | 36     | ra1               | IDENTIFIER      | ra1                 | char*          |
+| 16     | 37     | }                 | PUNCTUATION     | RIGHT_BRACE         | enumerated     |
+| 17     | 38     | 3                 | INTCONST        | 3                   | integer        |
+| 19     | 39     | " "               | COMMENT         | SL_COMMENT          | enumerated     |
+| 23     | 40     | "23-24"           | COMMENT         | NESTED_ML_COMMENT   | enumerated     |
+| 22     | 41     | "22-25"           | COMMENT         | ML_COMMENT          | enumerated     |
+| 26     | 42     | *                 | OPERATOR        | MULTIPLY            | enumerated     |
+| 26     | 43     | /                 | OPERATOR        | DIVIDE              | enumerated     |
++--------+--------+-------------------+-----------------+---------------------+----------------+
+|                                           END OF REPORT                                      |
++--------+--------+-------------------+-----------------+---------------------+----------------+

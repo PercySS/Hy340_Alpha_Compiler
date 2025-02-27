@@ -2,13 +2,8 @@
 #include "../src/al.hpp"
 
 extern int tokenNum;
-extern int inmlcomment;
-extern int inslcomment;
-extern int instring;
-int nest_level = 0;
-int currline;
-int prev_state;
-
+stack<int> tokenStack;
+string tempString = "";
 %}
 
 /* Options  section */
@@ -18,7 +13,7 @@ int prev_state;
 %option nounput
 %option noinput
 
-%x COMMENT NESTED
+%x COMMENT NESTED SLCOMMENT STRING
 
 
 Alpha       [a-zA-Z]
@@ -34,11 +29,7 @@ MACLN       [\r]
 %%
     /* Keywords */
 "if"|"else"|"while"|"for"|"function"|"return"|"break"|"continue"|"true"|"false"|"nil"|"local"|"global"|"and"|"not"|"or"|"int"|"void"|"char"|"main"|"switch"|"case"|"default"|"do"|"double"|"float"|"long"|"short"|"unsigned"|"signed"|"const"|"static"|"extern"|"typedef"|"struct"|"union"|"enum"|"sizeof"|"volatile"|"goto" {
-                                                                    
-                                                                    if (inslcomment > 0) {
-                                                                        return (TokenType)KEYWORD;
-                                                                    }
-                                                                    
+                                                                                                                                  
                                                                     alpha_token_t* token = new alpha_token_t();
                                                                     token->line = yylineno;
                                                                     token->numToken = tokenNum++;
@@ -56,9 +47,6 @@ MACLN       [\r]
 
     /* Operators */
 "+"|"-"|"*"|"/"|"%"|"="|"=="|"!"|"!="|"<"|"<="|">"|">="|"++"|"--"|"+="|"-="|"*="|"/="|"%=" { 
-                                                                if (inslcomment > 0) {
-                                                                    return (TokenType)OPERATOR;
-                                                                }  
                 
                                                                 alpha_token_t* token = new alpha_token_t();
                                                                 
@@ -117,9 +105,6 @@ MACLN       [\r]
 
     /* Delimiters */
 "("|")"|"{"|"}"|"["|"]"|";"|","|":"|"::"|"->"|"."|".."|"?" { 
-                                                                if (inslcomment > 0) {
-                                                                    return (TokenType)PUNCTUATION;
-                                                                }
                                                                 alpha_token_t* token = new alpha_token_t();
                                                                 token->line = yylineno;
                                                                 token->numToken = tokenNum++;
@@ -163,9 +148,6 @@ MACLN       [\r]
 
     /* Identifiers */   
 {Alpha}({Alpha}|{Digit}|_)*     { 
-                                    if (inslcomment > 0) {
-                                        return (TokenType)IDENTIFIER;
-                                    }
 
                                     alpha_token_t* token = new alpha_token_t();
                                     token->line = yylineno;
@@ -181,9 +163,6 @@ MACLN       [\r]
     
     /* Constants */
 {Digit}+                        { 
-                                    if (inslcomment > 0) {
-                                        return (TokenType)INTCONST;
-                                    }
                                     alpha_token_t* token = new alpha_token_t();                                    
                                     token->line = yylineno;
                                     token->numToken = tokenNum++;
@@ -197,9 +176,6 @@ MACLN       [\r]
                                 }
 
 {Digit}+"."{Digit}+             { 
-                                    if (inslcomment > 0) {
-                                        return (TokenType)REALCONST;
-                                    }
 
                                     alpha_token_t* token = new alpha_token_t();                                    
                                     token->line = yylineno;
@@ -212,128 +188,161 @@ MACLN       [\r]
                                     enqueueToken(token);
                                     return (TokenType)REALCONST;
                                 }
+    /* Strings */
+"\""                            { 
+                                    BEGIN(STRING);
+                                }
 
-    /* String Literals */
-"\""                            { }
+<STRING>\"                      {   
+                                    alpha_token_t* token = new alpha_token_t();
+                                    tempString.append("\"");
+                                    tempString.append('\0');
+                                    token->line = yylineno;
+                                    token->numToken = tokenNum++;
+                                    token->type = (TokenType)STRING;
+                                    token->content = tempString;
+                                    token->instance = "enumerated";
+                                    token->tokUpp = "STRING";
+
+                                    enqueueToken(token);
+                                    tempString = "";
+                                    BEGIN(INITIAL);
+                                    return (TokenType)STRING;
+                                }
+
+<STRING>\n                      {   
+                                    tempString.append('\n');
+                                    return (TokenType)STRING;
+                                }
+    /* escaped cahracters */
+<STRING>"\\n"                     { tempString.append("\\n"); }
+
+<STRING>"\\t"                     { tempString.append("\\t"); }
+
+<STRING>"\\r"                     { tempString.append("\\r"); }
+
+<STRING>"\\\""                    { tempString.append("\\\""); }
+
+<STRING>"\\\'"                    { tempString.append("\\\'"); }
+
+<STRING>"\\\\"                    { tempString.append("\\\\"); }
+
+<STRING>.                         { tempString.append(yytext); }
+
+<STRING><<EOF>>                 {
+                                    illegal_string(yylineno);
+                                    return (TokenType)STRING;
+                                }                      
+
+
 
 
     /* Single Line Comments */
-"//"                            {   
-                                    if (inslcomment > 0) {
-                                        return (TokenType)COMMENT;
-                                    }
+"//"                            { 
+                                    BEGIN(SLCOMMENT);
+                                }
 
-                                    inslcomment++;
+<SLCOMMENT>.+                   { 
+                                    return (TokenType)COMMENT;
+                                }
 
-                                    /* token for comment */
+<SLCOMMENT>\n                   {   
                                     alpha_token_t* token = new alpha_token_t();
-                                    
-                                    /* token and res for iterating */
-                                    alpha_token_t* token2 = new alpha_token_t();
-                                    int res = 0;
 
-                                    /* Load the token with the necessary information */
-                                    token->line = yylineno;
+                                    token->line = yylineno - 1;
                                     token->numToken = tokenNum++;
                                     token->type = (TokenType)COMMENT;
                                     token->content = "\" \"";
                                     token->instance = "enumerated";
                                     token->tokUpp = "SL_COMMENT";
-                                    
-                                    /* eat other tokens till i find a new line */
-                                    res = alpha_yylex(token2);
-                                    while (res != (TokenType)NL) {
-                                        res = alpha_yylex(token2);
-                                    }
 
-                                    inslcomment--;
-
-                                    delete token2;
                                     enqueueToken(token);
+                                    BEGIN(INITIAL);
+                                    
+                                    return (TokenType)COMMENT;
                                 }
 
 
     /* Multi Line Comments */
 "/*"                            {   
-                                    if (inslcomment > 0) {
-                                        return (TokenType)COMMENT;
-                                    }
-                                    nest_level++;
-                                    alpha_token_t* token = new alpha_token_t();
-                                    token->line = yylineno;
-                                    token->numToken = tokenNum++;
-                                    token->type = (TokenType)COMMENT;
-                                    token->content = "\"" + to_string(token->line) + " - ";
-                                    
-                                    prev_state = YY_START;
-
+                                    tokenStack.push(yylineno);
                                     BEGIN(COMMENT);
+                                    return (TokenType)COMMENT;
                                 }
 
-<COMMENT> {
-    "*/" {   
-        nest_level--;  
-        token->content += yylineno;
-        if (nest_level == 0) {
-            BEGIN(prev_state);
-        }
-    }
+<COMMENT>"*/"                   {
+                                    alpha_token_t* token = new alpha_token_t();
+                                    token->line = tokenStack.top();
+                                    token->numToken = tokenNum++;
+                                    token->type = (TokenType)COMMENT;
+                                    token->content = "\"" + intToString(token->line) + "-" + intToString(yylineno) + "\"";
+                                    token->instance = "enumerated";
+                                    token->tokUpp = "ML_COMMENT";
 
-    "/*" {                       
-        nest_level++;
-        prev_state = YY_START;
-        alpha_token_t* token = new alpha_token_t();
-        token->line = yylineno;
-        token->numToken = tokenNum++;
-        token->type = (TokenType)COMMENT;
-        token->content = "\"" + to_string(token->line) + " - ";
-        token->instance = "enumerated";
-        token->tokUpp = "BLOCK_COMMENT";
+                                    enqueueToken(token);
+                                    tokenStack.pop();
+                                    BEGIN(INITIAL);
+                                    return (TokenType)COMMENT; 
+                                }
 
-        BEGIN(NESTED);
-    }   
+<COMMENT>\n                     {
+                                    return (TokenType)NL;
+                                }
 
-    <<EOF>> {           
-        fprintf(stderr, "Error: Unterminated comment!\n"); 
-        yyterminate(); 
-    }
+<COMMENT><<EOF>>                { 
+                                    illegal_comment(tokenStack.top());
+                                    return (TokenType)COMMENT;
+                                }
 
-    .{ }
+<COMMENT>.                      { 
+                                    return (TokenType)COMMENT;
+                                }
 
-}
+<COMMENT>"/*"                   { 
+                                    tokenStack.push(yylineno);
+                                    BEGIN(NESTED);
+                                    return (TokenType)COMMENT;
+                                }
 
-<NESTED> {
-    "*/" {   
-        nest_level--;
-        token->content += std::to_string(yylineno);
-        
-        if (nest_level == 0) {
-            BEGIN(prev_state); 
-        }
-    }
+<NESTED>"*/"                    { 
+                                    alpha_token_t* token = new alpha_token_t();
+                                    token->line = tokenStack.top();
+                                    token->numToken = tokenNum++;
+                                    token->type = (TokenType)COMMENT;
+                                    token->content = "\"" + intToString(token->line) + "-" + intToString(yylineno) + "\"";
+                                    token->instance = "enumerated";
+                                    token->tokUpp = "NESTED_ML_COMMENT";
 
-    "/*" {   
-        nest_level++;
-        prev_state = YY_START;
+                                    enqueueToken(token);
+                                    tokenStack.pop();
+                                    
+                                    if (tokenStack.size() > 1) {
+                                        BEGIN(NESTED);
+                                    } else {
+                                        BEGIN(COMMENT);
+                                    }
+                                    return (TokenType)COMMENT;
+                                }
 
-        alpha_token_t* token = new alpha_token_t();
-        token->line = yylineno;
-        token->numToken = tokenNum++;
-        token->type = (TokenType)COMMENT;
-        token->content = "\"" + to_string(token->line) + " - ";
-        token->instance = "enumerated";
-        token->tokUpp = "NESTED_BL_COMMENT";
+<NESTED>\n                      {
+                                    return (TokenType)NL;
+                                }
 
-        BEGIN(NESTED);
-    }
+<NESTED><<EOF>>                 { 
+                                    illegal_comment(tokenStack.top());
+                                    return (TokenType)COMMENT;
+                                }
 
-    <<EOF>> {   
-        fprintf(stderr, "Error: Unterminated comment!\n"); 
-        yyterminate(); 
-    }
+<NESTED>.                       { 
+                                    return (TokenType)COMMENT;
+                                }
 
-    . { } 
-}
+<NESTED>"/*"                    {
+                                    tokenStack.push(yylineno);
+                                    BEGIN(NESTED);
+                                    return (TokenType)COMMENT;
+                                }
+
 
 
     /* WhiteSpaces */
@@ -348,11 +357,7 @@ MACLN       [\r]
 
 
     /* EOF */
-<<EOF>> { 
-            if (inmlcomment > 0) return (TokenType)ERROR_COMMENT;
-            
-            if (instring > 0) return (TokenType)ERROR_STRING; 
-            
+<<EOF>> {
             return (TokenType)END; 
         }
 

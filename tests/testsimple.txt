@@ -1,3 +1,4 @@
+// im  a comment
 if if ifif 
 ontws
 kjghdjkf+=().,
@@ -14,11 +15,15 @@ if { segamaw } then
     
 }
 3
-// im  a comment
 
 // sjfhsj // fdssdf
 
 
 /*
+/*
 */
 */
+*/
+
+
+"hello\nworld"

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <queue>
+#include <stack>
 #include <fstream>
 #include <cassert>
 #include <cstring>
@@ -18,16 +19,16 @@ using namespace std;
 typedef enum TokenType {
     UNEXPECTED = -2,
     END = -1,
-    INTCONST = 1,
-    REALCONST = 2,
+    COMMENT = 1,
+    INTCONST = 2,
+    REALCONST ,
     STRING,
     IDENTIFIER,
+    NL,
+    WS,
     KEYWORD,
     OPERATOR,
     PUNCTUATION,
-    COMMENT,
-    NL,
-    WS,
     ERROR_COMMENT,
     ERROR_STRING
 } TokenType;
@@ -55,5 +56,8 @@ void enqueueToken(alpha_token_t* token);
 
 int alpha_yylex(void* token);
 
+void illegal_comment(int line);
+
+void illegal_string(int line);
 
 #endif // AL_HPP
