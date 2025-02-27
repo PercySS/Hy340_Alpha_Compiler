@@ -18,8 +18,7 @@ int prev_state;
 %option nounput
 %option noinput
 
-%x COMMENT 
-%x NESTED
+%x COMMENT NESTED
 
 
 Alpha       [a-zA-Z]
@@ -272,66 +271,68 @@ MACLN       [\r]
                                 }
 
 <COMMENT> {
-    "*/" {
-        nest_level--;
-        token->content += std::to_string(yylineno);
+    "*/" {   
+        nest_level--;  
+        token->content += yylineno;
         if (nest_level == 0) {
-            BEGIN(prev_state);  // Exit when all nested levels are closed
+            BEGIN(prev_state);
         }
     }
 
-    "/*" {
+    "/*" {                       
         nest_level++;
-        prev_state = COMMENT;  // Keep track of previous state
-
+        prev_state = YY_START;
         alpha_token_t* token = new alpha_token_t();
         token->line = yylineno;
         token->numToken = tokenNum++;
         token->type = (TokenType)COMMENT;
-        token->content = "\"" + std::to_string(token->line) + " - ";
+        token->content = "\"" + to_string(token->line) + " - ";
         token->instance = "enumerated";
         token->tokUpp = "BLOCK_COMMENT";
 
         BEGIN(NESTED);
+    }   
+
+    <<EOF>> {           
+        fprintf(stderr, "Error: Unterminated comment!\n"); 
+        yyterminate(); 
     }
 
-    <<EOF>> {
-        fprintf(stderr, "Error: Unterminated comment!\n");
-        yyterminate();
-    }
+    .{ }
 
-    . { }  // Ignore all other characters
 }
 
 <NESTED> {
-    "*/" {
+    "*/" {   
         nest_level--;
         token->content += std::to_string(yylineno);
+        
         if (nest_level == 0) {
-            BEGIN(prev_state);  // Only return when all levels are closed
+            BEGIN(prev_state); 
         }
     }
 
-    "/*" {
+    "/*" {   
         nest_level++;
-        
+        prev_state = YY_START;
+
         alpha_token_t* token = new alpha_token_t();
         token->line = yylineno;
         token->numToken = tokenNum++;
         token->type = (TokenType)COMMENT;
-        token->content = "\"" + std::to_string(token->line) + " - ";
+        token->content = "\"" + to_string(token->line) + " - ";
         token->instance = "enumerated";
         token->tokUpp = "NESTED_BL_COMMENT";
 
-        BEGIN(NESTED);  // Stay in nested state
+        BEGIN(NESTED);
     }
 
-    <<EOF>> {
-        fprintf(stderr, "Error: Unterminated comment!\n");
-        yyterminate();
+    <<EOF>> {   
+        fprintf(stderr, "Error: Unterminated comment!\n"); 
+        yyterminate(); 
     }
 
-    . { }  // Ignore all characters
+    . { } 
 }
 
 
