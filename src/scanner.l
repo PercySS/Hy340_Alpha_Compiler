@@ -4,6 +4,7 @@
 extern int tokenNum;
 stack<int> tokenStack;
 string tempString = "";
+string tempStringRaw = "";
 %}
 
 /* Options  section */
@@ -28,7 +29,7 @@ MACLN       [\r]
 /* Token Rules section */
 %%
     /* Keywords */
-"if"|"else"|"while"|"for"|"function"|"return"|"break"|"continue"|"true"|"false"|"nil"|"local"|"global"|"and"|"not"|"or"|"int"|"void"|"char"|"main"|"switch"|"case"|"default"|"do"|"double"|"float"|"long"|"short"|"unsigned"|"signed"|"const"|"static"|"extern"|"typedef"|"struct"|"union"|"enum"|"sizeof"|"volatile"|"goto" {
+"if"|"else"|"while"|"for"|"function"|"return"|"break"|"continue"|"true"|"false"|"nil"|"and"|"not"|"or"|"local" {
                                                                                                                                   
                                                                     alpha_token_t* token = new alpha_token_t();
                                                                     token->line = yylineno;
@@ -46,7 +47,7 @@ MACLN       [\r]
 
 
     /* Operators */
-"+"|"-"|"*"|"/"|"%"|"="|"=="|"!"|"!="|"<"|"<="|">"|">="|"++"|"--"|"+="|"-="|"*="|"/="|"%=" { 
+"+"|"-"|"*"|"/"|"%"|"="|"=="|"!="|"<"|"<="|">"|">="|"++"|"--" { 
                 
                                                                 alpha_token_t* token = new alpha_token_t();
                                                                 
@@ -104,7 +105,7 @@ MACLN       [\r]
                                                             }
 
     /* Delimiters */
-"("|")"|"{"|"}"|"["|"]"|";"|","|":"|"::"|"->"|"."|".."|"?" { 
+"("|")"|"{"|"}"|"["|"]"|";"|","|":"|"::"|"."|".." { 
                                                                 alpha_token_t* token = new alpha_token_t();
                                                                 token->line = yylineno;
                                                                 token->numToken = tokenNum++;
@@ -191,51 +192,83 @@ MACLN       [\r]
     /* Strings */
 "\""                            { 
                                     BEGIN(STRING);
+                                    tempString.append("\"");
+                                    tempStringRaw.append("\"");
+                                    return (TokenType)STRING;
                                 }
 
 <STRING>\"                      {   
                                     alpha_token_t* token = new alpha_token_t();
                                     tempString.append("\"");
-                                    tempString.append('\0');
+                                    tempStringRaw.append("\"");
                                     token->line = yylineno;
                                     token->numToken = tokenNum++;
                                     token->type = (TokenType)STRING;
                                     token->content = tempString;
-                                    token->instance = "enumerated";
-                                    token->tokUpp = "STRING";
+                                    token->instance = "char*";
+                                    token->tokUpp = tempStringRaw;
 
                                     enqueueToken(token);
                                     tempString = "";
+                                    tempStringRaw = "";
                                     BEGIN(INITIAL);
                                     return (TokenType)STRING;
                                 }
 
-<STRING>\n                      {   
-                                    tempString.append('\n');
+<STRING>{NL}|{WINLN}|{MACLN}    {                     
+                                    tempString.append("\n");
+                                    tempStringRaw.append("\n");
                                     return (TokenType)STRING;
                                 }
     /* escaped cahracters */
-<STRING>"\\n"                     { tempString.append("\\n"); }
+<STRING>"\\n"                   { 
+                                    tempString.append("\n");
+                                    tempStringRaw.append(yytext);
+                                }
 
-<STRING>"\\t"                     { tempString.append("\\t"); }
 
-<STRING>"\\r"                     { tempString.append("\\r"); }
+<STRING>"\\t"                   { 
+                                    tempString.append("\t"); 
+                                    tempStringRaw.append(yytext);
+                                }
 
-<STRING>"\\\""                    { tempString.append("\\\""); }
+<STRING>"\\r"                   { 
+                                    tempString.append("\r");
+                                    tempStringRaw.append(yytext);
+                                }   
 
-<STRING>"\\\'"                    { tempString.append("\\\'"); }
+<STRING>"\\\""                  { 
+                                    tempString.append("\"");
+                                    tempStringRaw.append(yytext); 
+                                }
 
-<STRING>"\\\\"                    { tempString.append("\\\\"); }
+<STRING>"\\\'"                  { 
+                                    tempString.append("\'");
+                                    tempStringRaw.append(yytext);
+                                }
 
-<STRING>.                         { tempString.append(yytext); }
+<STRING>"\\\\"                    { 
+                                    tempString.append("\\");
+                                    tempStringRaw.append(yytext);
+                                }
+
+    /* Invalid Escapes */
+<STRING>"\\".                   { 
+                                    illegal_escape(yytext, yylineno);
+                                    return (TokenType)ERROR_STRING;
+                                }
+
+
+
+<STRING>.                       { 
+                                    tempString.append(yytext);
+                                    tempStringRaw.append(yytext);
+                                }
 
 <STRING><<EOF>>                 {
                                     illegal_string(yylineno);
-                                    return (TokenType)STRING;
-                                }                      
-
-
-
+                                    return (TokenType)ERROR_STRING;
+                                }
 
     /* Single Line Comments */
 "//"                            { 
@@ -246,21 +279,21 @@ MACLN       [\r]
                                     return (TokenType)COMMENT;
                                 }
 
-<SLCOMMENT>\n                   {   
-                                    alpha_token_t* token = new alpha_token_t();
+<SLCOMMENT>{NL}|{WINLN}|{MACLN}     {   
+                                        alpha_token_t* token = new alpha_token_t();
 
-                                    token->line = yylineno - 1;
-                                    token->numToken = tokenNum++;
-                                    token->type = (TokenType)COMMENT;
-                                    token->content = "\" \"";
-                                    token->instance = "enumerated";
-                                    token->tokUpp = "SL_COMMENT";
+                                        token->line = yylineno - 1;
+                                        token->numToken = tokenNum++;
+                                        token->type = (TokenType)COMMENT;
+                                        token->content = "\" \"";
+                                        token->instance = "enumerated";
+                                        token->tokUpp = "SL_COMMENT";
 
-                                    enqueueToken(token);
-                                    BEGIN(INITIAL);
-                                    
-                                    return (TokenType)COMMENT;
-                                }
+                                        enqueueToken(token);
+                                        BEGIN(INITIAL);
+                                        
+                                        return (TokenType)COMMENT;
+                                    }
 
 
     /* Multi Line Comments */
@@ -285,13 +318,13 @@ MACLN       [\r]
                                     return (TokenType)COMMENT; 
                                 }
 
-<COMMENT>\n                     {
+<COMMENT>{NL}|{WINLN}|{MACLN}   {
                                     return (TokenType)NL;
                                 }
 
 <COMMENT><<EOF>>                { 
                                     illegal_comment(tokenStack.top());
-                                    return (TokenType)COMMENT;
+                                    return (TokenType)ERROR_COMMENT;
                                 }
 
 <COMMENT>.                      { 
@@ -324,13 +357,13 @@ MACLN       [\r]
                                     return (TokenType)COMMENT;
                                 }
 
-<NESTED>\n                      {
+<NESTED>{NL}|{WINLN}|{MACLN}    {
                                     return (TokenType)NL;
                                 }
 
 <NESTED><<EOF>>                 { 
                                     illegal_comment(tokenStack.top());
-                                    return (TokenType)COMMENT;
+                                    return (TokenType)ERROR_COMMENT;
                                 }
 
 <NESTED>.                       { 
@@ -361,5 +394,8 @@ MACLN       [\r]
             return (TokenType)END; 
         }
 
-. { return (TokenType)UNEXPECTED; }
+.       {
+            illegal_token(yytext, yylineno);
+            return (TokenType)UNEXPECTED;
+        }
 %%

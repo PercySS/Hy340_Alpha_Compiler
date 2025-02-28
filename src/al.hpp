@@ -17,6 +17,8 @@ using namespace std;
 
 
 typedef enum TokenType {
+    ERROR_STRING = -4,
+    ERROR_COMMENT = -3,
     UNEXPECTED = -2,
     END = -1,
     COMMENT = 1,
@@ -28,9 +30,7 @@ typedef enum TokenType {
     WS,
     KEYWORD,
     OPERATOR,
-    PUNCTUATION,
-    ERROR_COMMENT,
-    ERROR_STRING
+    PUNCTUATION
 } TokenType;
 
 typedef struct alpha_token {
@@ -60,4 +60,7 @@ void illegal_comment(int line);
 
 void illegal_string(int line);
 
+void illegal_token(char* yytext, int line);
+
+void illegal_escape(char* yytext, int line);
 #endif // AL_HPP

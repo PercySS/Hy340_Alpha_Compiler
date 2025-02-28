@@ -88,6 +88,16 @@ void illegal_string(int line) {
     exit(1);
 }
 
+void illegal_token(char* yytext, int line) {
+    fprintf(yyout, "Error: Illegal token %s in line %d\n", yytext,line);
+    exit(1);
+}
+
+void illegal_escape(char* yytext, int line) {
+    fprintf(yyout, "Error: Illegal escape sequence %s in line %d\n", yytext, line);
+    exit(1); 
+}
+
 int main(int argc, char* argv[]) {
     alpha_token_t* token = new alpha_token_t();
     int res;
