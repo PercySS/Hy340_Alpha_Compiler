@@ -23,7 +23,7 @@ all: $(EXEC)
 # Generate scanner.cpp and scanner.hpp from scanner.l
 $(SCANNER_CPP) $(SCANNER_HPP): $(LEX_FILE)
 	@mkdir -p $(OUT_DIR)
-	$(FLEX) -d --outfile=$(SCANNER_CPP) --header-file=$(SCANNER_HPP) $(LEX_FILE)
+	$(FLEX) --outfile=$(SCANNER_CPP) --header-file=$(SCANNER_HPP) $(LEX_FILE)
 
 # Compile scanner.cpp
 $(SCANNER_OBJ): $(SCANNER_CPP) $(SCANNER_HPP) $(HEADER)
