@@ -1,0 +1,8 @@
+/**/ ---> nested <--> multi line 
+
+// -/-> nested 
+
+m/l comment 
+s/l comment
+string
+ 

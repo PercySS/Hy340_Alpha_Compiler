@@ -1,0 +1,19 @@
+Team Members
+
+csd4676 Dimitrios Makrogiannis.
+csd4621 Katerina Gyparaki.
+csd5140 Kallia Samaritaki.
+
+The program is able to recognize the following tokens:
+Keywords for alpha language.
+Identifiers.
+Numbers(Integers/Real).
+Operators.
+Punctuation symbols.
+Strings.
+Comments.
+
+Runs in oneiro server with the following command
+make clean
+make all
+./scanner.exe input_file output_file("optional")
