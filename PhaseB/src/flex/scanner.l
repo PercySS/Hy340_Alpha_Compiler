@@ -1,7 +1,7 @@
 %{
 #include "../src/al.hpp"
 
-extern int tokenNum;
+
 stack<int> tokenStack;
 string tempString = "";
 string tempStringRaw = "";
@@ -26,37 +26,22 @@ MACLN       [\r]
 
 
 
-/* Token Rules section */
+/* Tok` Rules section */
 %%
     /* Keywords */
 "if"|"else"|"while"|"for"|"function"|"return"|"break"|"continue"|"true"|"false"|"nil"|"and"|"not"|"or"|"local" {
                                                                                                                                   
-                                                                    alpha_token_t* token = new alpha_token_t();
-                                                                    token->line = yylineno;
-                                                                    token->numToken = tokenNum++;
-                                                                    token->type = (TokenType)KEYWORD;
-                                                                    token->content = yytext;
-                                                                    token->instance = "enumerated";
-                                                                    token->tokUpp = toUpper(token->content);
-
-                                                                    enqueueToken(token);
                                                                     
-                                                                    return (TokenType)KEYWORD;
+
+                                                                     
+                                                                    
+                                                                    return KEYWORD;
                                                                 }
 
 
 
     /* Operators */
-"+"|"-"|"*"|"/"|"%"|"="|"=="|"!="|"<"|"<="|">"|">="|"++"|"--" { 
-                
-                                                                alpha_token_t* token = new alpha_token_t();
-                                                                
-                                                                token->line = yylineno;
-                                                                token->numToken = tokenNum++;
-                                                                token->type = (TokenType)OPERATOR;
-                                                                token->content = yytext;
-                                                                token->instance = "enumerated";
-                                                                
+"+"|"-"|"*"|"/"|"%"|"="|"=="|"!="|"<"|"<="|">"|">="|"++"|"--" {
                                                                 if (strcmp(yytext, "+") == 0) {
                                                                     token->tokUpp = "PLUS";
                                                                 } else if (strcmp(yytext, "-") == 0) {
@@ -99,19 +84,13 @@ MACLN       [\r]
                                                                     token->tokUpp = "MODULO_ASSIGN";
                                                                 }
                                                                 
-                                                                enqueueToken(token);
-                                                                return (TokenType)OPERATOR;
+                                                                
+                                                                
                                                                 
                                                             }
 
     /* Delimiters */
-"("|")"|"{"|"}"|"["|"]"|";"|","|":"|"::"|"."|".." { 
-                                                                alpha_token_t* token = new alpha_token_t();
-                                                                token->line = yylineno;
-                                                                token->numToken = tokenNum++;
-                                                                token->type = (TokenType)PUNCTUATION;
-                                                                token->content = yytext;
-                                                                token->instance = "enumerated";
+"("|")"|"{"|"}"|"["|"]"|";"|","|":"|"::"|"."|".." {
 
                                                                 if (strcmp(yytext, "(") == 0) {
                                                                     token->tokUpp = "LEFT_PARENTHESIS";
@@ -142,52 +121,26 @@ MACLN       [\r]
                                                                 } else if (strcmp(yytext, "?") == 0) {
                                                                     token->tokUpp = "TURNARY";
                                                                 }
-
-                                                                enqueueToken(token);
-                                                                return (TokenType)PUNCTUATION;
                                                             }
 
     /* Identifiers */   
-{Alpha}({Alpha}|{Digit}|_)*     { 
-
-                                    alpha_token_t* token = new alpha_token_t();
-                                    token->line = yylineno;
-                                    token->numToken = tokenNum++;
-                                    token->type = (TokenType)IDENTIFIER;
-                                    token->content = yytext;
-                                    token->tokUpp = token->content ;  
-                                    token->instance = "char*";
+{Alpha}({Alpha}|{Digit}|_)*     {
                                     
-                                    enqueueToken(token);
-                                    return (TokenType)IDENTIFIER;
+                                     
+                                    return IDENTIFIER;
                                 }
     
     /* Constants */
-{Digit}+                        { 
-                                    alpha_token_t* token = new alpha_token_t();                                    
-                                    token->line = yylineno;
-                                    token->numToken = tokenNum++;
-                                    token->type = (TokenType)INTCONST;
-                                    token->content = yytext;
-                                    token->instance = "integer";
-                                    token->tokUpp = yytext;
+{Digit}+                        {
                                     
-                                    enqueueToken(token);
-                                    return (TokenType)INTCONST;
+                                     
+                                    return INTCONST;
                                 }
 
-{Digit}+"."{Digit}+             { 
-
-                                    alpha_token_t* token = new alpha_token_t();                                    
-                                    token->line = yylineno;
-                                    token->numToken = tokenNum++;
-                                    token->type = (TokenType)REALCONST;
-                                    token->content = yytext;
-                                    token->instance = "float";
-                                    token->tokUpp = yytext;
+{Digit}+"."{Digit}+             {
                                     
-                                    enqueueToken(token);
-                                    return (TokenType)REALCONST;
+                                     
+                                    return REALCONST;
                                 }
     /* Strings */
 "\""                            { 
@@ -208,7 +161,7 @@ MACLN       [\r]
                                     token->instance = "char*";
                                     token->tokUpp = tempStringRaw;
 
-                                    enqueueToken(token);
+                                     
                                     tempString = "";
                                     tempStringRaw = "";
                                     BEGIN(INITIAL);
@@ -289,7 +242,7 @@ MACLN       [\r]
                                         token->instance = "enumerated";
                                         token->tokUpp = "SL_COMMENT";
 
-                                        enqueueToken(token);
+                                         
                                         BEGIN(INITIAL);
                                         
                                         return (TokenType)COMMENT;
@@ -312,7 +265,7 @@ MACLN       [\r]
                                     token->instance = "enumerated";
                                     token->tokUpp = "ML_COMMENT";
 
-                                    enqueueToken(token);
+                                     
                                     tokenStack.pop();
                                     BEGIN(INITIAL);
                                     return (TokenType)COMMENT; 
@@ -346,7 +299,7 @@ MACLN       [\r]
                                     token->instance = "enumerated";
                                     token->tokUpp = "NESTED_ML_COMMENT";
 
-                                    enqueueToken(token);
+                                     
                                     tokenStack.pop();
                                     
                                     if (tokenStack.size() > 1) {
@@ -391,11 +344,11 @@ MACLN       [\r]
 
     /* EOF */
 <<EOF>> {
-            return (TokenType)END; 
+            return END; 
         }
 
 .       {
             illegal_token(yytext, yylineno);
-            return (TokenType)UNEXPECTED;
+            return UNEXPECTED;
         }
 %%

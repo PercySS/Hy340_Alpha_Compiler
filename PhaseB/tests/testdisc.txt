@@ -1,6 +1,6 @@
 while
 function peaky_foo(void){
-    printf("Hello\" \' World!");
+    printf("Hello World!");
 
     return;
 }
@@ -19,6 +19,4 @@ saucy:: . .
 /*
     My name is Jeff
 */
-/* /* balls */ */ 
-
-*/
+/* /* balls */ */

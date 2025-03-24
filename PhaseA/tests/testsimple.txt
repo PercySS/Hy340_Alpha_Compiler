@@ -21,7 +21,7 @@ if { segamaw } then
 
 "aaa_bbb_\\\n"
 
-"bitch\nAss\b"
+"bitch\nAss"
 
 /*
 /*

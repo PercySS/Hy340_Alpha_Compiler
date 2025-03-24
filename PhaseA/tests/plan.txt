@@ -1,8 +1,15 @@
-/**/ ---> nested <--> multi line 
+_a22asdasasfsafsadfasdadfa111
 
-// -/-> nested 
+test
 
-m/l comment 
-s/l comment
-string
- 
+/*sddfsfsfsdfd*/
+
+if
+*/
+else
+"\\\\\\\\\\\\\\\nasfsdfsdfds\\\\\""
+
+"
+afsfgsdfgdgd
+"
+19343534

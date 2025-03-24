@@ -23,7 +23,7 @@ typedef enum TokenType {
     END = -1,
     COMMENT = 1,
     INTCONST = 2,
-    REALCONST ,
+    REALCONST,
     STRING,
     IDENTIFIER,
     NL,
