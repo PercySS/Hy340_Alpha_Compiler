@@ -1,14 +1,18 @@
 %{
-#include "../src/al.hpp"
+#include <memory>
+#include <string>
+#include <iostream>
+#include "../yacc/parser.tab.hpp"
 
+#define YY_USER_ACTION yylloc.first_line = yylloc.last_line = yylineno;
 
 stack<int> tokenStack;
-string tempString = "";
-string tempStringRaw = "";
+
 %}
 
 /* Options  section */
-%option header-file="scanner.hpp"
+%option c++
+%option yyclass="MyParser::parser"
 %option noyywrap
 %option yylineno
 %option nounput
@@ -29,13 +33,38 @@ MACLN       [\r]
 /* Tok` Rules section */
 %%
     /* Keywords */
-"if"|"else"|"while"|"for"|"function"|"return"|"break"|"continue"|"true"|"false"|"nil"|"and"|"not"|"or"|"local" {
-                                                                                                                                  
-                                                                    
-
-                                                                     
-                                                                    
-                                                                    return KEYWORD;
+"if"|"else"|"while"|"for"|"function"|"return"|"break"|"continue"|"true"|"false"|"nil"|"and"|"not"|"or"|"local" {                                
+                                                                    if (strcmp(yytext, "if") == 0) {
+                                                                        return IF;
+                                                                    } else if (strcmp(yytext, "else") == 0) {
+                                                                        return ELSE;
+                                                                    } else if (strcmp(yytext, "while") == 0) {
+                                                                        return WHILE;
+                                                                    } else if (strcmp(yytext, "for") == 0) {
+                                                                        return FOR;
+                                                                    } else if (strcmp(yytext, "function") == 0) {
+                                                                        return FUNCTION;
+                                                                    } else if (strcmp(yytext, "return") == 0) {
+                                                                        return RETURN;
+                                                                    } else if (strcmp(yytext, "break") == 0) {
+                                                                        return BREAK;
+                                                                    } else if (strcmp(yytext, "continue") == 0) {
+                                                                        return CONTINUE;
+                                                                    } else if (strcmp(yytext, "true") == 0) {
+                                                                        return TRUE;
+                                                                    } else if (strcmp(yytext, "false") == 0) {
+                                                                        return FALSE;
+                                                                    } else if (strcmp(yytext, "nil") == 0) {
+                                                                        return NIL;
+                                                                    } else if (strcmp(yytext, "and") == 0) {
+                                                                        return AND;
+                                                                    } else if (strcmp(yytext, "not") == 0) {
+                                                                        return NOT;
+                                                                    } else if (strcmp(yytext, "or") == 0) {
+                                                                        return OR;
+                                                                    } else if (strcmp(yytext, "local") == 0) {
+                                                                        return LOCAL;
+                                                                    }
                                                                 }
 
 
@@ -43,184 +72,154 @@ MACLN       [\r]
     /* Operators */
 "+"|"-"|"*"|"/"|"%"|"="|"=="|"!="|"<"|"<="|">"|">="|"++"|"--" {
                                                                 if (strcmp(yytext, "+") == 0) {
-                                                                    token->tokUpp = "PLUS";
+                                                                    return PLUS;
                                                                 } else if (strcmp(yytext, "-") == 0) {
-                                                                    token->tokUpp = "MINUS";
+                                                                    return MINUS;
                                                                 } else if (strcmp(yytext, "*") == 0) {
-                                                                    token->tokUpp = "MULTIPLY";
+                                                                    return MULTIPLY;
                                                                 } else if (strcmp(yytext, "/") == 0) {
-                                                                    token->tokUpp = "DIVIDE";
+                                                                    return DIVIDE;
                                                                 } else if (strcmp(yytext, "%") == 0) {
-                                                                    token->tokUpp = "MODULO";
+                                                                    return MODULO;
                                                                 } else if (strcmp(yytext, "=") == 0) {
-                                                                    token->tokUpp = "ASSIGN";
+                                                                    return ASSIGN;
                                                                 } else if (strcmp(yytext, "==") == 0) {
-                                                                    token->tokUpp = "EQUAL";
+                                                                    return EQUAL;
                                                                 } else if (strcmp(yytext, "!") == 0) {
-                                                                    token->tokUpp = "NOT";
+                                                                    return NOTOP;
                                                                 } else if (strcmp(yytext, "!=") == 0) {
-                                                                    token->tokUpp = "NOT_EQUAL";
+                                                                    return NOT_EQUAL;
                                                                 } else if (strcmp(yytext, "<") == 0) {
-                                                                    token->tokUpp = "LESS_THAN";
+                                                                    return LESS_THAN;
                                                                 } else if (strcmp(yytext, "<=") == 0) {
-                                                                    token->tokUpp = "LESS_THAN_EQUAL";
+                                                                    return LESS_THAN_EQUAL;
                                                                 } else if (strcmp(yytext, ">") == 0) {
-                                                                    token->tokUpp = "GREATER_THAN";
+                                                                    return GREATER_THAN;
                                                                 } else if (strcmp(yytext, ">=") == 0) {
-                                                                    token->tokUpp = "GREATER_THAN_EQUAL";
+                                                                    return GREATER_THAN_EQUAL;
                                                                 } else if (strcmp(yytext, "++") == 0) {
-                                                                    token->tokUpp = "INCREMENT";
+                                                                    return INCREMENT;
                                                                 } else if (strcmp(yytext, "--") == 0) {
-                                                                    token->tokUpp = "DECREMENT";
+                                                                    return DECREMENT;
                                                                 } else if (strcmp(yytext, "+=") == 0) {
-                                                                    token->tokUpp = "PLUS_ASSIGN";
+                                                                    return PLUS_ASSIGN;
                                                                 } else if (strcmp(yytext, "-=") == 0) {
-                                                                    token->tokUpp = "MINUS_ASSIGN";
+                                                                    return MINUS_ASSIGN;
                                                                 } else if (strcmp(yytext, "*=") == 0) {
-                                                                    token->tokUpp = "MULTIPLY_ASSIGN";
+                                                                    return MULTIPLY_ASSIGN;
                                                                 } else if (strcmp(yytext, "/=") == 0) {
-                                                                    token->tokUpp = "DIVIDE_ASSIGN";
+                                                                    return DIVIDE_ASSIGN;
                                                                 } else if (strcmp(yytext, "%=") == 0) {
-                                                                    token->tokUpp = "MODULO_ASSIGN";
+                                                                    return MODULO_ASSIGN;
                                                                 }
-                                                                
-                                                                
-                                                                
-                                                                
                                                             }
 
     /* Delimiters */
 "("|")"|"{"|"}"|"["|"]"|";"|","|":"|"::"|"."|".." {
 
                                                                 if (strcmp(yytext, "(") == 0) {
-                                                                    token->tokUpp = "LEFT_PARENTHESIS";
+                                                                    return LEFT_PARENTHESIS;
                                                                 } else if (strcmp(yytext, ")") == 0) {
-                                                                    token->tokUpp = "RIGHT_PARENTHESIS";
+                                                                    return RIGHT_PARENTHESIS;
                                                                 } else if (strcmp(yytext, "{") == 0) {
-                                                                    token->tokUpp = "LEFT_BRACE";
+                                                                    return LEFT_BRACE;
                                                                 } else if (strcmp(yytext, "}") == 0) {
-                                                                    token->tokUpp = "RIGHT_BRACE";
+                                                                    return RIGHT_BRACE;
                                                                 } else if (strcmp(yytext, "[") == 0) {
-                                                                    token->tokUpp = "LEFT_BRACKET";
+                                                                    return LEFT_BRACKET;
                                                                 } else if (strcmp(yytext, "]") == 0) {
-                                                                    token->tokUpp = "RIGHT_BRACKET";
+                                                                    return RIGHT_BRACKET;
                                                                 } else if (strcmp(yytext, ";") == 0) {
-                                                                    token->tokUpp = "SEMICOLON";
+                                                                    return SEMICOLON;
                                                                 } else if (strcmp(yytext, ",") == 0) {
-                                                                    token->tokUpp = "COMMA";
+                                                                    return COMMA;
                                                                 } else if (strcmp(yytext, ":") == 0) {
-                                                                    token->tokUpp = "COLON";
+                                                                    return COLON;
                                                                 } else if (strcmp(yytext, "::") == 0) {
-                                                                    token->tokUpp = "DOUBLE_COLON";
+                                                                    return DOUBLE_COLON;
                                                                 } else if (strcmp(yytext, "->") == 0) {
-                                                                    token->tokUpp = "ARROW";
+                                                                    return ARROW;
                                                                 } else if (strcmp(yytext, ".") == 0) {
-                                                                    token->tokUpp = "DOT";
+                                                                    return DOT;
                                                                 } else if (strcmp(yytext, "..") == 0) {
-                                                                    token->tokUpp = "DOUBLE_DOT";
+                                                                    return DOUBLE_DOT;
                                                                 } else if (strcmp(yytext, "?") == 0) {
-                                                                    token->tokUpp = "TURNARY";
+                                                                    return TURNARY;
                                                                 }
                                                             }
 
     /* Identifiers */   
 {Alpha}({Alpha}|{Digit}|_)*     {
-                                    
-                                     
+                                    yylval.emplace<std::string>(yytext);
                                     return IDENTIFIER;
                                 }
     
     /* Constants */
 {Digit}+                        {
-                                    
-                                     
-                                    return INTCONST;
+                                    yylval.emplace<int>(atoi(yytext));
+                                    return INTEGER;
                                 }
 
 {Digit}+"."{Digit}+             {
-                                    
-                                     
-                                    return REALCONST;
+                                    yylval.emplace<float>(atof(yytext));
+                                    return REAL;
                                 }
     /* Strings */
 "\""                            { 
+                                    yylval.emplace<std::string>(""); // we initialize the string with an empty string
                                     BEGIN(STRING);
-                                    tempString.append("\"");
-                                    tempStringRaw.append("\"");
-                                    return (TokenType)STRING;
                                 }
 
-<STRING>\"                      {   
-                                    alpha_token_t* token = new alpha_token_t();
-                                    tempString.append("\"");
-                                    tempStringRaw.append("\"");
-                                    token->line = yylineno;
-                                    token->numToken = tokenNum++;
-                                    token->type = (TokenType)STRING;
-                                    token->content = tempString;
-                                    token->instance = "char*";
-                                    token->tokUpp = tempStringRaw;
-
-                                     
-                                    tempString = "";
-                                    tempStringRaw = "";
+<STRING>\"                      {
                                     BEGIN(INITIAL);
-                                    return (TokenType)STRING;
+                                    return STRING;
                                 }
 
 <STRING>{NL}|{WINLN}|{MACLN}    {                     
-                                    tempString.append("\n");
-                                    tempStringRaw.append("\n");
-                                    return (TokenType)STRING;
+                                    std::get<std::string>(yylval) += '\n';
+                                    return STRING;
                                 }
     /* escaped cahracters */
 <STRING>"\\n"                   { 
-                                    tempString.append("\n");
-                                    tempStringRaw.append(yytext);
+                                    std::get<std::string>(yylval) += '\n';
                                 }
 
 
 <STRING>"\\t"                   { 
-                                    tempString.append("\t"); 
-                                    tempStringRaw.append(yytext);
+                                    std::get<std::string>(yylval) += '\t';
                                 }
 
 <STRING>"\\r"                   { 
-                                    tempString.append("\r");
-                                    tempStringRaw.append(yytext);
+                                    std::get<std::string>(yylval) += '\r';
                                 }   
 
 <STRING>"\\\""                  { 
-                                    tempString.append("\"");
-                                    tempStringRaw.append(yytext); 
+                                    std::get<std::string>(yylval) += '\"';
                                 }
 
 <STRING>"\\\'"                  { 
-                                    tempString.append("\'");
-                                    tempStringRaw.append(yytext);
+                                    std::get<std::string>(yylval) += '\'';
                                 }
 
 <STRING>"\\\\"                    { 
-                                    tempString.append("\\");
-                                    tempStringRaw.append(yytext);
+                                    std::get<std::string>(yylval) += '\\';
                                 }
 
     /* Invalid Escapes */
 <STRING>"\\".                   { 
-                                    illegal_escape(yytext, yylineno);
-                                    return (TokenType)ERROR_STRING;
+                                    yyerror("Invalid escape sequence", yylineno);
+                                    return ERROR_STRING;
                                 }
 
 
 
 <STRING>.                       { 
-                                    tempString.append(yytext);
-                                    tempStringRaw.append(yytext);
+                                    std::get<std::string>(yylval) += yytext;
                                 }
 
 <STRING><<EOF>>                 {
-                                    illegal_string(yylineno);
-                                    return (TokenType)ERROR_STRING;
+                                    yyerrror("Unterminated string", yylineno);
+                                    return ERROR_STRING;
                                 }
 
     /* Single Line Comments */
@@ -228,24 +227,12 @@ MACLN       [\r]
                                     BEGIN(SLCOMMENT);
                                 }
 
-<SLCOMMENT>.+                   { 
-                                    return (TokenType)COMMENT;
-                                }
+<SLCOMMENT>.+                   { }
 
-<SLCOMMENT>{NL}|{WINLN}|{MACLN}     {   
-                                        alpha_token_t* token = new alpha_token_t();
-
-                                        token->line = yylineno - 1;
-                                        token->numToken = tokenNum++;
-                                        token->type = (TokenType)COMMENT;
-                                        token->content = "\" \"";
-                                        token->instance = "enumerated";
-                                        token->tokUpp = "SL_COMMENT";
-
-                                         
+<SLCOMMENT>{NL}|{WINLN}|{MACLN}     {    
                                         BEGIN(INITIAL);
                                         
-                                        return (TokenType)COMMENT;
+                                        return  COMMENT;
                                     }
 
 
@@ -256,50 +243,27 @@ MACLN       [\r]
                                     return (TokenType)COMMENT;
                                 }
 
-<COMMENT>"*/"                   {
-                                    alpha_token_t* token = new alpha_token_t();
-                                    token->line = tokenStack.top();
-                                    token->numToken = tokenNum++;
-                                    token->type = (TokenType)COMMENT;
-                                    token->content = "\"" + intToString(token->line) + "-" + intToString(yylineno) + "\"";
-                                    token->instance = "enumerated";
-                                    token->tokUpp = "ML_COMMENT";
-
-                                     
+<COMMENT>"*/"                   { 
                                     tokenStack.pop();
                                     BEGIN(INITIAL);
-                                    return (TokenType)COMMENT; 
+                                    return COMMENT; 
                                 }
 
-<COMMENT>{NL}|{WINLN}|{MACLN}   {
-                                    return (TokenType)NL;
-                                }
+<COMMENT>{NL}|{WINLN}|{MACLN}   { }
 
 <COMMENT><<EOF>>                { 
-                                    illegal_comment(tokenStack.top());
-                                    return (TokenType)ERROR_COMMENT;
+                                    yyerror("Unterminated comment", yylineno);
+                                    return ERROR_COMMENT;
                                 }
 
-<COMMENT>.                      { 
-                                    return (TokenType)COMMENT;
-                                }
+<COMMENT>.                      { }
 
 <COMMENT>"/*"                   { 
                                     tokenStack.push(yylineno);
                                     BEGIN(NESTED);
-                                    return (TokenType)COMMENT;
                                 }
 
 <NESTED>"*/"                    { 
-                                    alpha_token_t* token = new alpha_token_t();
-                                    token->line = tokenStack.top();
-                                    token->numToken = tokenNum++;
-                                    token->type = (TokenType)COMMENT;
-                                    token->content = "\"" + intToString(token->line) + "-" + intToString(yylineno) + "\"";
-                                    token->instance = "enumerated";
-                                    token->tokUpp = "NESTED_ML_COMMENT";
-
-                                     
                                     tokenStack.pop();
                                     
                                     if (tokenStack.size() > 1) {
@@ -307,39 +271,31 @@ MACLN       [\r]
                                     } else {
                                         BEGIN(COMMENT);
                                     }
-                                    return (TokenType)COMMENT;
+                                    return COMMENT;
                                 }
 
-<NESTED>{NL}|{WINLN}|{MACLN}    {
-                                    return (TokenType)NL;
-                                }
+<NESTED>{NL}|{WINLN}|{MACLN}    { }
 
 <NESTED><<EOF>>                 { 
-                                    illegal_comment(tokenStack.top());
-                                    return (TokenType)ERROR_COMMENT;
+                                    yyerror("Unterminated comment", yylineno);
+                                    return ERROR_COMMENT;
                                 }
 
-<NESTED>.                       { 
-                                    return (TokenType)COMMENT;
-                                }
+<NESTED>.                       { }
 
 <NESTED>"/*"                    {
                                     tokenStack.push(yylineno);
                                     BEGIN(NESTED);
-                                    return (TokenType)COMMENT;
+                                    return COMMENT;
                                 }
 
 
 
     /* WhiteSpaces */
-{WhiteSpace}+                   {  
-                                    return (TokenType)WS;
-                                } 
+{WhiteSpace}+                   { } 
 
     /* New Line  for all environments */
-{NL}|{WINLN}|{MACLN}            { 
-                                    return (TokenType)NL;
-                                }
+{NL}|{WINLN}|{MACLN}            { }
 
 
     /* EOF */
@@ -348,7 +304,7 @@ MACLN       [\r]
         }
 
 .       {
-            illegal_token(yytext, yylineno);
+            yyerror("Unexpected character", yylineno);
             return UNEXPECTED;
         }
 %%

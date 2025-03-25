@@ -1,19 +1,32 @@
+/* -*- mode: bison -*- */
+
+%language       "C++"
+%define         api.value.type          variant
+
+%define         api.token.constructor
+%define         parse.assert            true
+%define         parse.trace             true
+%define         parse.error             verbose
+%define         parse.lac               full
+%require        "3.2"
+
 %{
-#include <stdio.h>
-#include <stdlib.h>
+#include <iostream>
+#include <string>
+#include <cstdarg>
+#include <cstdio>
 #include "../symtable/symtable.hpp"
 
-extern int alpha_yylex();
-void yyerror(const char *s);
+extern int yylex();
+void yyerror(const char *s, int line);
 
 %}
 
 
-%union {
-    int                 ival;
-    float               fval;
-    char*               sval;
-    symtable::Symbol    *symbol;
+%code requires {
+    #include <memory> 
+    #include <iostream>
+    #include <string>
 }
 
 %start program
@@ -37,9 +50,6 @@ void yyerror(const char *s);
 %token ASSIGN
 %token PLUS_ASSIGN
 %token MINUS_ASSIGN
-%token MULTIPLY_ASSIGN
-%token DIVIDE_ASSIGN
-%token MODULO_ASSIGN
 
 
 /* Delimeters */
@@ -56,7 +66,6 @@ void yyerror(const char *s);
 %token RIGHT_BRACE
 %token LEFT_BRACKET
 %token RIGHT_BRACKET
-%token ARROW
 
 /* Keywords */
 %token IF
@@ -76,12 +85,13 @@ void yyerror(const char *s);
 %token OR 
 
 /* Constants */
-%token <ival> INTEGER
-%token <fval> REAL
-%token <sval> STRING
-%token <sval> IDENTIFIER 
+%token <int> INTEGER;
+%token <float> REAL
+%token <std::string> STRING
+%token <std::string> IDENTIFIER 
 
-%type <symbol> lvalue
+%token IGNORED
+
 
 %left RIGHT_PARENTHESIS LEFT_PARENTHESIS
 %left RIGHT_BRACKET LEFT_BRACKET
@@ -92,10 +102,11 @@ void yyerror(const char *s);
 
 %left MULTIPLY DIVIDE MODULO
 
-%right PLUS MINUS
+%right PLUS
 
 %nonassoc GREATER_THAN GREATER_THAN_EQUAL LESS_THAN LESS_THAN_EQUAL
-
+%nonassoc LOWER_THAN_ELSE
+%nonassoc ELSE
 %nonassoc EQUAL NOT_EQUAL
 
 %left AND 
@@ -107,7 +118,6 @@ void yyerror(const char *s);
 
 %left RIGHT_BRACE LEFT_BRACE
 
-%destructor { free($$); } IDENTIFIER  
 
 %%
 program: stmt_list
@@ -130,24 +140,21 @@ stmt_list:  stmt stmt_list
             ;
 
 expr:   assignexpr
-        | expr op expr  
+        | expr PLUS expr
+        | expr MINUS expr
+        | expr MULTIPLY expr
+        | expr DIVIDE expr
+        | expr MODULO expr
+        | expr GREATER_THAN expr
+        | expr LESS_THAN expr
+        | expr GREATER_THAN_EQUAL expr
+        | expr LESS_THAN_EQUAL expr
+        | expr EQUAL expr
+        | expr NOT_EQUAL expr
+        | expr AND expr
+        | expr OR expr
         | term
         ;
-
-op: PLUS
-    | MINUS
-    | MULTIPLY
-    | DIVIDE
-    | MODULO
-    | GREATER_THAN
-    | LESS_THAN
-    | GREATER_THAN_EQUAL
-    | LESS_THAN_EQUAL
-    | EQUAL
-    | NOT_EQUAL
-    | AND
-    | OR
-    ;
 
 term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS
         | MINUS expr %prec UMINUS
@@ -231,7 +238,7 @@ idlist: IDENTIFIER
         | /* empty */
         ;
 
-ifstmt: IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt
+ifstmt: IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt %prec LOWER_THAN_ELSE
         | IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt ELSE stmt
         ;
 
@@ -248,7 +255,7 @@ returnstmt: RETURN expr SEMICOLON
 
 
 
-void yyerror(char *s) {
-    fprintf(stderr, "Error: %s\n", s);
-    return 0;
+void yyerror(const char *s, int line) {
+    std::cerr << "Error at line " << line << ": " << s << std::endl;
+    exit(1);
 }
