@@ -10,6 +10,8 @@
 #include <fstream>
 #include <cassert>
 #include <cstring>
+#include <vector>
+#include <unordered_map>
 
 using namespace std;
 
@@ -33,18 +35,18 @@ public:
     SymbolTable();
     ~SymbolTable();
 
-
-    bool insert(SymEntry* entry);
-    SymEntry* lookup(string name);
+    int getScope() const;
+    int insert(SymEntry* entry);
+    SymEntry* lookup(const string& name);
     
     void hide(int scope);
     void enter_scope();
     void exit_scope();
     
-    void printTable();
+    void printTable(FILE* output) const;
 private:
     int scope;
-    vector<
+    std::vector<std::unordered_map<string, SymEntry>> scopes;
 };
 
 

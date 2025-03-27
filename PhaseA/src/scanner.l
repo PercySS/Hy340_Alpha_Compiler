@@ -8,8 +8,6 @@ string tempStringRaw = "";
 %}
 
 /* Options  section */
-%option c++
-%option yyclass="MyParser::parser"
 %option header-file="scanner.hpp"
 %option noyywrap
 %option yylineno

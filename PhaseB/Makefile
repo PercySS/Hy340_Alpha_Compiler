@@ -1,44 +1,50 @@
-# Compiler and flags
-CXX = g++
-CXXFLAGS = -Wall -ansi -pedantic -g -I$(OUT_DIR)
-FLEX = flex
+# === File: PhaseB/Makefile ===
+
+# Tools
+CXX      = g++
+FLEX     = flex
+BISON    = bison
 
 # Directories
-SRC_DIR = src
-OUT_DIR = out
+SRC_DIR  = src
+OUT_DIR  = out
 
 # Files
-LEX_FILE = $(SRC_DIR)/scanner.l
+SCANNER  = $(SRC_DIR)/scanner.l
+PARSER   = $(SRC_DIR)/parser.y
+MAIN     = $(SRC_DIR)/main.cpp
+SYMTABLE = $(SRC_DIR)/symtable.cpp
+
+# Generated
+PARSER_CPP = $(OUT_DIR)/parser.tab.cpp
+PARSER_HPP = $(OUT_DIR)/parser.tab.hpp
 SCANNER_CPP = $(OUT_DIR)/scanner.cpp
 SCANNER_HPP = $(OUT_DIR)/scanner.hpp
-SCANNER_OBJ = $(OUT_DIR)/scanner.o
-AL_CPP = $(SRC_DIR)/al.cpp
-AL_OBJ = $(OUT_DIR)/al.o
-HEADER = $(SRC_DIR)/al.hpp
-EXEC = scanner.exe
 
-# Targets
-all: $(EXEC)
+# Executable
+TARGET   = compiler
 
-# Generate scanner.cpp and scanner.hpp from scanner.l
-$(SCANNER_CPP) $(SCANNER_HPP): $(LEX_FILE)
-	@mkdir -p $(OUT_DIR)
-	$(FLEX) --outfile=$(SCANNER_CPP) $(LEX_FILE)
-	@mv scanner.hpp $(OUT_DIR)
+# Build flags
+CXXFLAGS = -Wall -ansi -pedantic -g -std=c++11 -I$(OUT_DIR)
+LDFLAGS  = -lfl
 
-# Compile scanner.cpp
-$(SCANNER_OBJ): $(SCANNER_CPP) $(SCANNER_HPP) $(HEADER)
-	$(CXX) $(CXXFLAGS) -c $(SCANNER_CPP) -o $(SCANNER_OBJ)
+# Default build
+all: $(TARGET)
 
-# Compile al.cpp
-$(AL_OBJ): $(AL_CPP) $(HEADER) $(SCANNER_HPP)
-	$(CXX) $(CXXFLAGS) -c $(AL_CPP) -o $(AL_OBJ)
+# Final linking
+$(TARGET): $(SCANNER_CPP) $(PARSER_CPP) $(SYMTABLE) $(MAIN)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
-# Link everything into the final executable
-$(EXEC): $(SCANNER_OBJ) $(AL_OBJ)
-	$(CXX) $(CXXFLAGS) $(SCANNER_OBJ) $(AL_OBJ) -o $(EXEC)
+# Bison: .y -> .cpp + .hpp
+$(PARSER_CPP) $(PARSER_HPP): $(PARSER)
+	$(BISON) -d --defines=$(PARSER_HPP) -o $(PARSER_CPP) $(PARSER)
 
-# Clean compiled files
+# Flex: .l -> .cpp + .hpp
+$(SCANNER_CPP) $(SCANNER_HPP): $(SCANNER)
+	$(FLEX) -o $(SCANNER_CPP) --header-file=$(SCANNER_HPP) $(SCANNER)
+
+# Clean
 clean:
-	rm -rf $(OUT_DIR)/*.o $(OUT_DIR)/scanner.cpp $(OUT_DIR)/scanner.hpp $(EXEC)
-	rmdir $(OUT_DIR) 2> /dev/null || true
+	rm -f $(OUT_DIR)/*.cpp $(OUT_DIR)/*.hpp $(TARGET)
+
+.PHONY: all clean

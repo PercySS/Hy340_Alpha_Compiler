@@ -1,12 +1,67 @@
-#include <iostream>
-#include "./symtable/symtable.hpp"
+#include "symtable.hpp"
+#include "../out/parser.tab.hpp"    // Include Bison header to get yyparse()
+#include <cstdio>
+#include <cstdlib> 
 
+extern FILE* yyin;
+extern FILE* yyout;
+extern int yydebug;
 
+// Global variables for correct handling of the symbol table
+SymbolTable symTable;
+bool inFunction = false;
+int rabbitHole = 0;
 
+int main(int argc, char** argv) {
+    // handle the input output according to arguments
+    FILE* input = stdin;
+    FILE* output = stdout;
 
+    if (argc < 2) {
+        printf("Usage: %s <input_file> [output_file]\n", argv[0]);
+        return 1;
+    }
 
+    input = fopen(argv[1], "r");
+    if (!input) {
+        printf("Error: Could not open input file\n");
+        return 1;
+    }
 
-int main() {
+    yyin = input;
+
+    // If an output file is provided, open it for writing
+    FILE* outputFile;
+    if (argc == 3) {
+        outputFile = fopen(argv[2], "w");
+        if (!outputFile) {
+            std::cerr << "Error: Could not open output file." << argv[2] << std::endl;
+            fclose(input);
+            return 1;
+        }
+        yyout = outputFile;
+    }
+
+    yyout = output;
+
     
+    // Start parsing
+    int result = yyparse();
+
+    if (result == 0) {
+        printf("Parsing completed successfully!\n");
+    } else {
+        printf("Parsing failed.\n");
+    }
+
+    // Print the symbol table
+    symTable.printTable(output);
+
+    // Close the input and output files
+    fclose(input);
+    if (argc >= 3) {
+        fclose(output);
+    }
+
     return 0;
 }

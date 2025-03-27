@@ -1,1 +1,1 @@
-Error: Illegal token $ in line 2
+Error: Comment not closed at line 3
