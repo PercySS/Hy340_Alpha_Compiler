@@ -12,8 +12,7 @@
 #include <cstring>
 #include <vector>
 #include <unordered_map>
-
-using namespace std;
+#include <stack>
 
 typedef enum {
     VAR,
@@ -22,12 +21,14 @@ typedef enum {
     FORARG
 } SymbolType;
 
-typedef struct {
-    string name;
+
+typedef struct SymEntry {
+    std::string name;
     SymbolType type;
     int scope;
     int line;
     bool isActive;
+    std::vector<SymEntry*> args;
 } SymEntry;
 
 class SymbolTable {
@@ -35,10 +36,17 @@ public:
     SymbolTable();
     ~SymbolTable();
 
+    std::vector<std::string> libfuncs; 
+    std::stack<SymEntry*> funcStack;
+
     int getScope() const;
+
+    // insertion
     int insert(SymEntry* entry);
-    SymEntry* lookup(const string& name);
     
+    // lookupz
+    SymEntry* lookup(const std::string& name, int scope = -1) const;
+
     void hide(int scope);
     void enter_scope();
     void exit_scope();
@@ -46,9 +54,12 @@ public:
     void printTable(FILE* output) const;
 private:
     int scope;
-    std::vector<std::unordered_map<string, SymEntry>> scopes;
+    std::vector<std::vector<std::pair<std::string, SymEntry>>> scopes;
 };
 
+std::string typeToString(SymbolType type);
+
+std::string generateAnonymousName();
 
 
 #endif // SYMTABLE_HPP

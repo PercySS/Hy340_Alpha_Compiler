@@ -99,7 +99,7 @@ extern int yydebug;
     OR = 300,                      /* OR  */
     INTEGER = 301,                 /* INTEGER  */
     REAL = 302,                    /* REAL  */
-    STRING = 303,                  /* STRING  */
+    STRINGT = 303,                 /* STRINGT  */
     IDENTIFIER = 304,              /* IDENTIFIER  */
     ERROR_COMMENT = 305,           /* ERROR_COMMENT  */
     ERROR_STRING = 306,            /* ERROR_STRING  */
@@ -115,7 +115,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 25 "src/parser.y"
+#line 26 "src/parser.y"
 
     int int_val;
     float float_val;

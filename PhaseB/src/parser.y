@@ -1,5 +1,5 @@
 %define         parse.error     verbose
-%define         parse.trace
+%define         parse.trace    
 %locations
 
 %{
@@ -11,10 +11,10 @@
 #include "../src/symtable.hpp"
 
 extern SymbolTable symTable;
-extern bool inFunction;
+extern bool skipBlockScope;
 extern int rabbitHole;
 extern int yylex();
-
+extern int yylineno;
 extern FILE *yyin;
 extern FILE *yyout;
 void myerror(YYLTYPE* loc, const char* msg);
@@ -86,7 +86,7 @@ void yyerror(const char* msg);
 /* Constants */
 %token <int_val> INTEGER;
 %token <float_val> REAL
-%token <str_val> STRING
+%token <str_val> STRINGT
 %token <str_val> IDENTIFIER 
 
 /* Extra Tokens */
@@ -95,11 +95,10 @@ void yyerror(const char* msg);
 %token ERROR_ESCAPE
 %token UNDEF
 
-
-%type <str_val> stmt_list stmt
-%type <str_val> ifstmt whilestmt forstmt returnstmt block funcdef const idlist
-%type <int_val> expr
-%type <str_val> assignexpr primary lvalue member call callsuffix normcall methodcall elist objectdef indexed indexedelem
+%type <str_val> assignexpr lvalue primary const
+%type <str_val> call callsuffix normcall methodcall
+%type <str_val> elist objectdef indexed indexedelem
+%type <str_val> idlist
 %type <str_val> errors
 
 
@@ -151,18 +150,18 @@ stmt: expr SEMICOLON    {
                                 fprintf(yyout, "[-] Reduced: stmt -> forstmt\n");
                         }
 
-        | returnstmt    {
+        | returnstmt    {       
+                                if (funcStack.empty()) myerror(&@1, "Error: Return statement outside of function");
                                 fprintf(yyout, "[-] Reduced: stmt -> returnstmt\n");
                         }
 
-        | BREAK SEMICOLON       {
+        | BREAK SEMICOLON       {       
+                                        if (rabbitHole < 1)  myerror(&@1, "Error: Break statement outside of loop");
                                         fprintf(yyout, "[-] Reduced: stmt -> BREAK SEMICOLON\n");
                                 }
 
         | CONTINUE SEMICOLON    {       
-                                        if (rabbitHole < 1) {
-                                            myerror(&@1, "Error: Continue statement outside of loop");
-                                        }
+                                        if (rabbitHole < 1) myerror(&@1, "Error: Continue statement outside of loop");
                                         fprintf(yyout, "[-] Reduced: stmt -> CONTINUE SEMICOLON\n");
                                 }
         | block                 {       
@@ -182,11 +181,12 @@ stmt: expr SEMICOLON    {
                                 }
         ;
     
-stmt_list:  stmt stmt_list      {
+stmt_list:  stmt stmt_list     {
                                         fprintf(yyout, "[-] Reduced: stmt_list -> stmt stmt_list\n");
                                 }
 
-            | /* empty */       {
+            | /* empty */       {       
+                                        fprintf(yyout, "%s\n", yylval.str_val);
                                         fprintf(yyout, "[-] Reduced: stmt_list -> /* empty */\n");
                                 }
             ;
@@ -195,7 +195,7 @@ expr:   assignexpr              {
                                         fprintf(yyout, "[-] Reduced: expr -> assignexpr\n");
                                 }
 
-        | expr PLUS expr        {
+        | expr PLUS expr        {       
                                         fprintf(yyout, "[-] Reduced: expr -> expr PLUS expr\n");
                                 }
 
@@ -256,9 +256,7 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
                                                         fprintf(yyout, "[-] Reduced: term -> LEFT_PARENTHESIS expr RIGHT_PARENTHESIS\n");
                                                 }
 
-        | MINUS expr %prec UMINUS               {
-
-                                                        
+        | MINUS expr %prec UMINUS               {       
                                                         fprintf(yyout, "[-] Reduced: term -> MINUS expr\n");
                                                 }
 
@@ -266,19 +264,27 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
                                                         fprintf(yyout, "[-] Reduced: term -> NOT expr\n");
                                                 }
 
-        | INCREMENT lvalue                      {
+        | INCREMENT lvalue                      {       
+                                                        SymEntry* found = symTable.lookup($2);
+                                                        if (found && found->type == FUNC) myerror(&@1, "Error: Function is not l-value");
                                                         fprintf(yyout, "[-] Reduced: term -> INCREMENT lvalue\n");
                                                 }
 
-        | lvalue INCREMENT                      {
+        | lvalue INCREMENT                      {       
+                                                        SymEntry* found = symTable.lookup($1);
+                                                        if (found && found->type == FUNC) myerror(&@1, "Error: Function call is not l-value");
                                                         fprintf(yyout, "[-] Reduced: term -> lvalue INCREMENT\n");
                                                 }
 
-        | DECREMENT lvalue                      {
+        | DECREMENT lvalue                      {       
+                                                        SymEntry* found = symTable.lookup($2);
+                                                        if (found && found->type == FUNC) myerror(&@1, "Error: Function call is not l-value");
                                                         fprintf(yyout, "[-] Reduced: term -> DECREMENT lvalue\n");
                                                 }
 
-        | lvalue DECREMENT                      {
+        | lvalue DECREMENT                      {       
+                                                        SymEntry* found = symTable.lookup($1);
+                                                        if (found && found->type == FUNC) myerror(&@1, "Error: Function call is not l-value");
                                                         fprintf(yyout, "[-] Reduced: term -> lvalue DECREMENT\n");
                                                 }        
         
@@ -296,6 +302,7 @@ assignexpr:     lvalue ASSIGN expr              {
                                                 }
 
                 | lvalue MINUS_ASSIGN expr      {
+                                                        fprintf(yyout, "[-] Reduced: assignexpr -> lvalue ASSIGN expr\n");
                                                         fprintf(yyout, "[-] Reduced: assignexpr -> lvalue MINUS_ASSIGN expr\n");
                                                 }
                 ;
@@ -320,14 +327,34 @@ primary: lvalue                 {
                                 }
         ;
 
-lvalue: IDENTIFIER              {
+lvalue: IDENTIFIER              {       
+                                        SymEntry* found = symTable.lookup($1);
+
+                                        if (found && found->type == FUNC) myerror(&@1, "Error: Function is not l-value");
+
                                         fprintf(yyout, "[-] Reduced: lvalue -> IDENTIFIER\n");
                                 }
-        | LOCAL IDENTIFIER      {
+        | LOCAL IDENTIFIER      {       
+                                        SymEntry* found = symTable.lookupInCurrentScope($2);
+
+                                        if (found) myerror(&@2, "Error: Identifier already declared in this scope.");
+
+                                        SymEntry* entry = new SymEntry;
+                                        entry->name = $2;
+                                        entry->type = VAR;
+                                        entry->scope = symTable.getScope();
+                                        
+
                                         fprintf(yyout, "[-] Reduced: lvalue -> LOCAL IDENTIFIER\n");
                                 }
 
-        | DOUBLE_COLON IDENTIFIER       {
+        | DOUBLE_COLON IDENTIFIER       {       
+                                                SymEntry* found = symTable.lookupGlobal($2);
+                                                
+                                                if (!found) {
+                                                        myerror(&@2, "Error: Variable not declared in global scope.");
+                                                }
+
                                                 fprintf(yyout, "[-] Reduced: lvalue -> DOUBLE_COLON IDENTIFIER\n");
                                         }
 
@@ -389,7 +416,7 @@ elist: expr                     {
                                         fprintf(yyout, "[-] Reduced: elist -> expr\n");
                                 }
 
-        | expr COMMA elist      {
+        | elist COMMA expr      {
                                         fprintf(yyout, "[-] Reduced: elist -> expr COMMA elist\n");
                                 }
 
@@ -421,18 +448,37 @@ indexedelem: LEFT_BRACE expr COLON expr RIGHT_BRACE     {
                                                         }
             ;
 
-block: LEFT_BRACE stmt_list RIGHT_BRACE         {       
+block: LEFT_BRACE       { 
+                                if (!skipBlockScope) symTable.enter_scope(); 
+                        } stmt_list RIGHT_BRACE {
+                                                        symTable.exit_scope();      
                                                         fprintf(yyout, "[-] Reduced: block -> LEFT_BRACE stmt_list RIGHT_BRACE\n");
                                                 }
         ;
 
-funcdef: FUNCTION IDENTIFIER LEFT_PARENTHESIS idlist RIGHT_PARENTHESIS block    {
+funcdef: FUNCTION IDENTIFIER LEFT_PARENTHESIS {
+                                                Symentry* found = lookupInCurrentScope($2);
+
+                                                if (found) myerror(&@2, "Error: Identifier
+
+
+
+
+
+                                                } idlist RIGHT_PARENTHESIS block {
+                                                                                        funcStack.pop();
+                                                                                        skipBlockScope = false;
                                                                                         fprintf(yyout, "[-] Reduced: funcdef -> FUNCTION IDENTIFIER LEFT_PARENTHESIS idlist RIGHT_PARENTHESIS block\n");
                                                                                 }
                                                 
-        | FUNCTION LEFT_PARENTHESIS idlist RIGHT_PARENTHESIS block      {
-                                                                                fprintf(yyout, "[-] Reduced: funcdef -> FUNCTION LEFT_PARENTHESIS idlist RIGHT_PARENTHESIS block\n");
-                                                                        }
+        | FUNCTION LEFT_PARENTHESIS     {
+
+
+                                        } idlist RIGHT_PARENTHESIS block        {       
+                                                                                        funcStack.pop();
+                                                                                        skipBlockScope = false;
+                                                                                        fprintf(yyout, "[-] Reduced: funcdef -> FUNCTION LEFT_PARENTHESIS idlist RIGHT_PARENTHESIS block\n");
+                                                                                }
                                 
         ;
         
@@ -444,7 +490,8 @@ const:  INTEGER         {
                                 fprintf(yyout, "[-] Reduced: const -> REAL\n");
                         }
         
-        | STRING        {
+        | STRINGT       {
+                                $$ = $1;
                                 fprintf(yyout, "[-] Reduced: const -> STRING\n");
                         }
 
@@ -461,10 +508,44 @@ const:  INTEGER         {
                         }
         ;
 
-idlist: IDENTIFIER      {      
+idlist: IDENTIFIER      {       
+                                SymEntry* entry = new SymEntry;
+                                entry->name = $1;
+                                entry->type = FORARG;
+                                entry->scope = symTable.getScope();
+                                entry->line = yylineno;
+                                entry->isActive = true;
+                                fprintf(yyout, "Inserting id in symtable\n");
+                                int res = symTable.insert(entry);
+
+                                if (res == 2) myerror(&@1, "Error: Variable already declared in this scope.");
+                                if (res == 3) myerror(&@1, "Error: Cannot shadow lib functions.");
+                                if (res == 4) myerror(&@1, "Error: Cannot shadow user-active functions");
+
+                                funcStack.top()->args.push_back(entry);
+                                // print name : forarg of func : name
+                                fprintf(yyout, "[-] Inserting %s as forarg in func %s\n", $1, funcStack.top()->name.c_str());
+
                                 fprintf(yyout, "[-] Reduced: idlist -> IDENTIFIER\n");
                         }
-        | idlist COMMA IDENTIFIER   {
+        | idlist COMMA IDENTIFIER   {   
+                                        SymEntry* entry = new SymEntry;
+                                        entry->name = $3;
+                                        entry->type = FORARG;
+                                        entry->scope = symTable.getScope();
+                                        entry->line = yylineno;
+                                        entry->isActive = true;
+                                        fprintf(yyout, "Inserting id in symtable\n");
+                                        int res = symTable.insert(entry);
+
+                                        if (res == 2) myerror(&@3, "Error: Variable already declared in this scope.");
+                                        if (res == 3) myerror(&@3, "Error: Cannot shadow lib functions.");
+                                        if (res == 4) myerror(&@3, "Error: Cannot shadow user-active functions");
+
+                                        funcStack.top()->args.push_back(entry);
+                                        
+                                        fprintf(yyout, "[-] Inserting %s as forarg in func %s\n", $3, funcStack.top()->name.c_str());
+
                                         fprintf(yyout, "[-] Reduced: idlist -> idlist COMMA IDENTIFIER\n");
                                     }
         | /* empty */           {
@@ -472,27 +553,41 @@ idlist: IDENTIFIER      {
                                 }
         ;
 
-ifstmt: IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt %prec LOWER_THAN_ELSE   {
+ifstmt: IF LEFT_PARENTHESIS     {
+
+                                } expr RIGHT_PARENTHESIS stmt %prec LOWER_THAN_ELSE   {
                                                                                     fprintf(yyout, "[-] Reduced: ifstmt -> IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt\n");
                                                                                 }
 
-        | IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt ELSE stmt             {
+        | ifstmt ELSE stmt             {
                                                                                     fprintf(yyout, "[-] Reduced: ifstmt -> IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt ELSE stmt\n");
                                                                                 }
         ;
 
-whilestmt: WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt           {
-                                                                                fprintf(yyout, "[-] Reduced: whilestmt -> WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt\n");
-                                                                        }
+whilestmt: WHILE LEFT_PARENTHESIS       {
+                                        rabbitHole++;
+                                        } expr RIGHT_PARENTHESIS        {
+                                                                                symTable.enter_scope();
+                                                                        } stmt  {       
+                                                                                        rabbitHole--;
+                                                                                        symTable.exit_scope();
+                                                                                        fprintf(yyout, "[-] Reduced: whilestmt -> WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt\n");
+                                                                                }
         ;
 
-forstmt: FOR LEFT_PARENTHESIS elist SEMICOLON expr SEMICOLON elist RIGHT_PARENTHESIS stmt  {
+forstmt: FOR LEFT_PARENTHESIS   {
+                                        rabbitHole++;
+                                } elist SEMICOLON expr SEMICOLON elist RIGHT_PARENTHESIS {
+                                                                                                        symTable.enter_scope();
+                                                                                                } stmt   {       
+                                                                                                        rabbitHole--;
+                                                                                                        symTable.exit_scope();
                                                                                                         fprintf(yyout, "[-] Reduced: forstmt -> FOR LEFT_PARENTHESIS elist SEMICOLON expr SEMICOLON elist RIGHT_PARENTHESIS stmt\n");
                                                                                                 }
         ;
 
 returnstmt: RETURN expr SEMICOLON       {
-                                            fprintf(yyout, "[-] Reduced: returnstmt -> RETURN expr SEMICOLON\n");
+                                                fprintf(yyout, "[-] Reduced: returnstmt -> RETURN expr SEMICOLON\n");
                                         }
             | RETURN SEMICOLON          {
                                                 fprintf(yyout, "[-] Reduced: returnstmt -> RETURN SEMICOLON\n");

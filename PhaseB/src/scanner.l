@@ -241,25 +241,14 @@ MACLN       [\r]
                                     return REAL;
                                 }
     /* Strings */
-"\""                            { 
+\"                              { 
                                     reset_string_buffer(); // we make a clean buffer for the string
                                     BEGIN(STRING);
                                 }
 
-<STRING>\"                      {   
-                                    fprintf(yyout, "[+] Shift token string.\n");
-                                    yylval.str_val = strdup(string_buffer);
-                                    reset_string_buffer();
-
-                                    BEGIN(INITIAL);
-                                    return STRING;
-                                }
-
-<STRING>{NL}|{WINLN}|{MACLN}    {
-                                    append_to_string_buffer("\n");
-                                }
     /* escaped cahracters */
-<STRING>"\\n"                   { 
+<STRING>"\\n"                   {   
+                                    fprintf(yyout, "[*] Escape sequence: \\n\n");
                                     append_to_string_buffer("\n");
                                 }
 
@@ -284,6 +273,26 @@ MACLN       [\r]
                                     append_to_string_buffer("\\");
                                 }
 
+<STRING>{NL}|{WINLN}|{MACLN}    {
+                                    append_to_string_buffer("\n");
+                                }
+
+<STRING>\"                      {   
+                                    string_buffer[string_len] = '\0'; // null-terminate the string
+                                    yylval.str_val = strdup(string_buffer);
+
+                                    fprintf(yyout, "[+] Shift token string: %s\n", yylval.str_val);
+
+                                    BEGIN(INITIAL);
+                                    return STRINGT;
+                                }
+
+
+<STRING>.                       {   
+                                    fprintf(yyout, "[*] Caught char in string: %s\n", yytext);
+                                    append_to_string_buffer(yytext);
+                                }
+
     /* Invalid Escapes */
 <STRING>"\\".                   {
                                     return ERROR_ESCAPE;
@@ -291,13 +300,11 @@ MACLN       [\r]
 
 
 
-<STRING>.                       { 
-                                    append_to_string_buffer(yytext);
-                                }
 
 <STRING><<EOF>>                 {
                                     return ERROR_STRING;
                                 }
+
 
     /* Single Line Comments */
 "//"                            { 

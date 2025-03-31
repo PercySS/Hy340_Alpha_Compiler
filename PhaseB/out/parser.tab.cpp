@@ -77,17 +77,18 @@
 #include "../src/symtable.hpp"
 
 extern SymbolTable symTable;
-extern bool inFunction;
+extern std::stack<SymEntry*> funcStack;
+extern bool skipBlockScope;
 extern int rabbitHole;
 extern int yylex();
-
+extern int yylineno;
 extern FILE *yyin;
 extern FILE *yyout;
 void myerror(YYLTYPE* loc, const char* msg);
 void yyerror(const char* msg);
 
 
-#line 91 "out/parser.tab.cpp"
+#line 92 "out/parser.tab.cpp"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -163,7 +164,7 @@ enum yysymbol_kind_t
   YYSYMBOL_OR = 45,                        /* OR  */
   YYSYMBOL_INTEGER = 46,                   /* INTEGER  */
   YYSYMBOL_REAL = 47,                      /* REAL  */
-  YYSYMBOL_STRING = 48,                    /* STRING  */
+  YYSYMBOL_STRINGT = 48,                   /* STRINGT  */
   YYSYMBOL_IDENTIFIER = 49,                /* IDENTIFIER  */
   YYSYMBOL_ERROR_COMMENT = 50,             /* ERROR_COMMENT  */
   YYSYMBOL_ERROR_STRING = 51,              /* ERROR_STRING  */
@@ -198,11 +199,9 @@ enum yysymbol_kind_t
   YYSYMBOL_idlist = 80,                    /* idlist  */
   YYSYMBOL_ifstmt = 81,                    /* ifstmt  */
   YYSYMBOL_whilestmt = 82,                 /* whilestmt  */
-  YYSYMBOL_83_4 = 83,                      /* $@4  */
-  YYSYMBOL_forstmt = 84,                   /* forstmt  */
-  YYSYMBOL_85_5 = 85,                      /* $@5  */
-  YYSYMBOL_returnstmt = 86,                /* returnstmt  */
-  YYSYMBOL_errors = 87                     /* errors  */
+  YYSYMBOL_forstmt = 83,                   /* forstmt  */
+  YYSYMBOL_returnstmt = 84,                /* returnstmt  */
+  YYSYMBOL_errors = 85                     /* errors  */
 };
 typedef enum yysymbol_kind_t yysymbol_kind_t;
 
@@ -533,16 +532,16 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  73
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   547
+#define YYLAST   507
 
 /* YYNTOKENS -- Number of terminals.  */
 #define YYNTOKENS  56
 /* YYNNTS -- Number of nonterminals.  */
-#define YYNNTS  32
+#define YYNNTS  30
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  96
+#define YYNRULES  94
 /* YYNSTATES -- Number of states.  */
-#define YYNSTATES  183
+#define YYNSTATES  181
 
 /* YYMAXUTOK -- Last valid token kind.  */
 #define YYMAXUTOK   310
@@ -597,16 +596,16 @@ static const yytype_int8 yytranslate[] =
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int16 yyrline[] =
 {
-       0,   133,   133,   138,   142,   146,   150,   154,   161,   168,
-     174,   178,   182,   186,   191,   195,   200,   204,   208,   212,
-     216,   220,   224,   228,   232,   236,   240,   244,   248,   252,
-     256,   261,   265,   271,   275,   279,   283,   287,   291,   296,
-     316,   320,   325,   329,   333,   337,   340,   345,   348,   352,
-     356,   361,   365,   369,   373,   378,   382,   386,   391,   395,
-     400,   405,   410,   414,   418,   423,   427,   432,   436,   441,
-     446,   446,   454,   454,   477,   477,   501,   505,   509,   513,
-     517,   521,   526,   540,   543,   548,   552,   557,   557,   565,
-     565,   573,   576,   581,   587,   593,   599
+       0,   133,   133,   138,   142,   146,   150,   154,   159,   164,
+     168,   172,   176,   180,   185,   189,   195,   199,   203,   207,
+     211,   215,   219,   223,   227,   231,   235,   239,   243,   247,
+     251,   256,   260,   266,   270,   276,   282,   288,   294,   299,
+     326,   354,   386,   390,   394,   398,   401,   406,   409,   417,
+     423,   428,   432,   436,   440,   445,   449,   453,   458,   462,
+     467,   472,   477,   481,   485,   490,   494,   499,   503,   508,
+     513,   513,   521,   521,   547,   547,   576,   580,   584,   589,
+     593,   597,   602,   622,   642,   647,   651,   656,   661,   666,
+     669,   674,   680,   686,   692
 };
 #endif
 
@@ -630,14 +629,13 @@ static const char *const yytname[] =
   "LEFT_PARENTHESIS", "RIGHT_PARENTHESIS", "LEFT_BRACE", "RIGHT_BRACE",
   "LEFT_BRACKET", "RIGHT_BRACKET", "IF", "ELSE", "WHILE", "FOR",
   "FUNCTION", "RETURN", "BREAK", "CONTINUE", "TRUE", "FALSE", "NIL",
-  "LOCAL", "AND", "NOT", "OR", "INTEGER", "REAL", "STRING", "IDENTIFIER",
+  "LOCAL", "AND", "NOT", "OR", "INTEGER", "REAL", "STRINGT", "IDENTIFIER",
   "ERROR_COMMENT", "ERROR_STRING", "ERROR_ESCAPE", "UNDEF",
   "LOWER_THAN_ELSE", "UMINUS", "$accept", "program", "stmt", "stmt_list",
   "expr", "term", "assignexpr", "primary", "lvalue", "member", "call",
   "callsuffix", "normcall", "methodcall", "elist", "objectdef", "indexed",
   "indexedelem", "block", "$@1", "funcdef", "$@2", "$@3", "const",
-  "idlist", "ifstmt", "whilestmt", "$@4", "forstmt", "$@5", "returnstmt",
-  "errors", YY_NULLPTR
+  "idlist", "ifstmt", "whilestmt", "forstmt", "returnstmt", "errors", YY_NULLPTR
 };
 
 static const char *
@@ -647,7 +645,7 @@ yysymbol_name (yysymbol_kind_t yysymbol)
 }
 #endif
 
-#define YYPACT_NINF (-143)
+#define YYPACT_NINF (-153)
 
 #define yypact_value_is_default(Yyn) \
   ((Yyn) == YYPACT_NINF)
@@ -661,25 +659,25 @@ yysymbol_name (yysymbol_kind_t yysymbol)
    STATE-NUM.  */
 static const yytype_int16 yypact[] =
 {
-      90,   224,   -13,   -13,  -143,   -47,     3,  -143,   146,   -14,
-    -143,  -143,     9,   185,     5,    12,  -143,  -143,  -143,   -30,
-     224,  -143,  -143,  -143,  -143,  -143,  -143,  -143,  -143,    22,
-      90,  -143,   271,  -143,  -143,  -143,   508,  -143,    73,  -143,
-    -143,  -143,  -143,  -143,  -143,  -143,  -143,  -143,  -143,     4,
-      44,    73,    44,  -143,   289,    35,    90,   224,   300,    42,
-      33,  -143,   224,    49,    61,  -143,    64,  -143,   318,  -143,
-    -143,  -143,   502,  -143,  -143,   224,   224,   224,   224,   224,
-     224,   224,   224,   224,   224,   224,  -143,   224,   224,  -143,
-    -143,   224,   224,   224,    46,    50,   224,   224,  -143,  -143,
-    -143,    51,   224,   224,    75,  -143,    81,    79,   343,   224,
-    -143,    83,  -143,   363,   224,   224,    59,  -143,  -143,   209,
-     502,   209,   209,   209,   369,   369,   369,   369,    -8,    -8,
-      66,  -143,  -143,  -143,  -143,  -143,    88,    92,   387,  -143,
-      94,   415,    81,   224,  -143,   224,  -143,  -143,    90,   430,
-      97,  -143,   -10,    59,   224,  -143,  -143,  -143,  -143,    96,
-     458,   101,    90,   224,    86,   117,    34,   120,  -143,  -143,
-      90,  -143,   485,  -143,  -143,   117,  -143,  -143,   224,  -143,
-     121,    90,  -143
+     142,   222,   -19,   -19,  -153,   -38,    11,  -153,    90,    -9,
+       4,     6,   -17,   183,     5,    23,  -153,  -153,  -153,    24,
+     222,  -153,  -153,  -153,  -153,  -153,  -153,  -153,  -153,    54,
+     142,  -153,   269,  -153,  -153,  -153,   468,  -153,    20,  -153,
+    -153,  -153,  -153,  -153,  -153,  -153,  -153,  -153,  -153,    36,
+     210,    20,   210,  -153,   287,    59,   142,   222,   462,   -16,
+     -10,  -153,   222,   222,   222,  -153,    64,  -153,   298,  -153,
+    -153,  -153,   462,  -153,  -153,   222,   222,   222,   222,   222,
+     222,   222,   222,   222,   222,   222,  -153,   222,   222,  -153,
+    -153,   222,   222,   222,    49,    62,   222,   222,  -153,  -153,
+    -153,    72,   222,   222,    67,  -153,    97,   105,   315,   222,
+    -153,   108,  -153,   341,   365,    18,    91,  -153,  -153,   115,
+     462,   115,   115,   115,   205,   205,   205,   205,    22,    22,
+      96,  -153,  -153,  -153,  -153,  -153,   118,     1,   389,  -153,
+      44,   417,    97,   222,  -153,   222,   462,  -153,   142,   142,
+     222,  -153,    46,    91,   222,  -153,  -153,  -153,  -153,    77,
+     433,   113,  -153,   445,    98,   121,    80,    87,  -153,  -153,
+     142,   222,  -153,  -153,   121,  -153,  -153,    94,  -153,   142,
+    -153
 };
 
 /* YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
@@ -688,42 +686,40 @@ static const yytype_int16 yypact[] =
 static const yytype_int8 yydefact[] =
 {
       15,     0,     0,     0,    12,     0,     0,    70,    64,     0,
-      87,    89,     0,     0,     0,     0,    79,    80,    81,     0,
-       0,    76,    77,    78,    47,    93,    94,    95,    96,     0,
+       0,     0,     0,     0,     0,     0,    79,    80,    81,     0,
+       0,    76,    77,    78,    47,    91,    92,    93,    94,     0,
       15,     2,     0,    30,    16,    38,    42,    50,    43,    44,
       10,    11,    46,     4,     5,     6,     7,    13,    32,     0,
       34,     0,    36,    49,     0,     0,    15,     0,    62,     0,
-       0,    67,     0,     0,     0,    74,     0,    92,     0,     8,
+       0,    67,     0,     0,    64,    74,     0,    90,     0,     8,
        9,    48,    33,     1,    14,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     3,     0,     0,    35,
       37,     0,     0,     0,     0,     0,    64,     0,    56,    58,
-      59,     0,    64,     0,     0,    31,    45,     0,     0,    64,
-      65,     0,    66,     0,     0,    64,    84,    72,    91,    17,
+      59,     0,    64,     0,     0,    31,    45,     0,     0,     0,
+      65,     0,    66,     0,     0,     0,    84,    72,    89,    17,
       18,    19,    20,    21,    23,    25,    22,    24,    26,    27,
       28,    29,    39,    40,    41,    51,     0,     0,     0,    53,
        0,     0,     0,    64,    71,     0,    63,    68,     0,     0,
        0,    82,     0,    84,    64,    60,    52,    55,    54,     0,
-       0,    85,     0,     0,     0,     0,     0,     0,    57,    69,
-       0,    88,     0,    83,    75,     0,    61,    86,    64,    73,
-       0,     0,    90
+       0,    85,    87,     0,     0,     0,     0,     0,    57,    69,
+       0,    64,    83,    75,     0,    61,    86,     0,    73,     0,
+      88
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int16 yypgoto[] =
 {
-    -143,  -143,  -122,   -15,     0,  -143,  -143,  -143,    62,  -143,
-      68,  -143,  -143,  -143,   -88,  -143,  -143,    38,  -142,  -143,
-      -3,  -143,  -143,  -143,    -2,  -143,  -143,  -143,  -143,  -143,
-    -143,  -143
+    -153,  -153,  -131,   -28,    -1,  -153,  -153,  -153,    66,  -153,
+     107,  -153,  -153,  -153,   -55,  -153,  -153,    39,  -152,  -153,
+      -5,  -153,  -153,  -153,    -2,  -153,  -153,  -153,  -153,  -153
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_uint8 yydefgoto[] =
 {
-       0,    29,    30,    31,    58,    33,    34,    35,    36,    37,
+       0,    29,    30,    31,    32,    33,    34,    35,    36,    37,
       38,    98,    99,   100,    59,    39,    60,    61,    40,    56,
-      41,   153,   116,    42,   152,    43,    44,    63,    45,    64,
-      46,    47
+      41,   153,   116,    42,   152,    43,    44,    45,    46,    47
 };
 
 /* YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
@@ -731,58 +727,54 @@ static const yytype_uint8 yydefgoto[] =
    number is the opposite.  If YYTABLE_NINF, syntax error.  */
 static const yytype_int16 yytable[] =
 {
-      32,    48,    53,    55,    -1,    -1,    54,     1,   137,     5,
-     164,    62,    49,    68,   140,    74,   165,     2,     3,    71,
-      72,   146,    73,   174,    69,     5,   161,   150,     6,    19,
-      32,    70,     8,   179,    65,    87,    24,    88,    12,    12,
-     171,   107,    16,    17,    18,    19,   104,    20,   177,    21,
-      22,    23,    24,   111,   164,   159,    32,   108,    66,   182,
-     175,   106,   113,   112,    50,    52,   167,    94,    95,    96,
-      51,    51,   110,    97,   114,   119,   120,   121,   122,   123,
-     124,   125,   126,   127,   128,   129,   115,   130,   131,   117,
-     180,   132,   133,   134,     1,   135,   101,   138,   102,   136,
-     139,   142,   103,   141,     2,     3,   143,   144,   151,     4,
-      57,    88,     5,   154,   149,     6,   163,     7,   155,     8,
-     157,     9,   168,    10,    11,    12,    13,    14,    15,    16,
-      17,    18,    19,   170,    20,   173,    21,    22,    23,    24,
-      25,    26,    27,    28,     7,   160,   176,   181,    32,   147,
-       1,   166,     0,     0,     0,     0,     0,     0,     0,     0,
-       2,     3,    32,   172,     0,     0,     0,     0,     5,     0,
-      32,     6,     0,    57,     0,     8,     0,     0,     0,     0,
-       0,    32,     0,     0,     0,    16,    17,    18,    19,     1,
-      20,     0,    21,    22,    23,    24,     0,     0,     0,     2,
-       3,     0,     0,     0,    67,     0,     0,     5,     0,     0,
-       6,     0,    75,     0,     8,     0,     0,    80,    81,    82,
-      83,    84,    85,     0,    16,    17,    18,    19,     1,    20,
-       0,    21,    22,    23,    24,     0,     0,     0,     2,     3,
-       0,     0,     0,     0,     0,     0,     5,     0,     0,     6,
-       0,     0,    87,     8,    88,     0,     0,     0,     0,     0,
-       0,     0,     0,    16,    17,    18,    19,     0,    20,     0,
-      21,    22,    23,    24,    75,    76,    77,    78,    79,    80,
-      81,    82,    83,    84,    85,     0,     0,     0,     0,     0,
-      86,     0,    75,    76,    77,    78,    79,    80,    81,    82,
-      83,    84,    85,    75,    76,    77,    78,    79,    80,    81,
-      82,    83,    84,    85,    87,   105,    88,     0,     0,     0,
-     109,    75,    76,    77,    78,    79,    80,    81,    82,    83,
-      84,    85,    87,     0,    88,     0,     0,   118,     0,     0,
-       0,     0,     0,    87,     0,    88,    75,    76,    77,    78,
-      79,    80,    81,    82,    83,    84,    85,     0,     0,     0,
-       0,    87,     0,    88,   145,     0,    75,    76,    77,    78,
-      79,    80,    81,    82,    83,    84,    85,    -1,    -1,    -1,
-      -1,    84,    85,     0,     0,     0,    87,     0,    88,   148,
+      48,    55,    74,     5,   109,    54,    49,    58,    65,   115,
+     111,    53,    68,   173,   110,     1,    62,   161,   162,    72,
+     112,   109,   178,    19,    69,     2,     3,   155,   107,    63,
+      24,    64,    66,     5,    -1,    -1,     6,   150,   109,   176,
+       8,   137,    70,   101,   104,   102,    12,   140,   180,   103,
+      16,    17,    18,    19,    73,    20,   108,    21,    22,    23,
+      24,   113,   114,    58,   109,    87,   164,    88,    50,    52,
+     157,    12,   165,    71,   119,   120,   121,   122,   123,   124,
+     125,   126,   127,   128,   129,   106,   130,   131,   159,   117,
+     132,   133,   134,   142,     1,    58,   138,   109,   135,   167,
+     164,    58,   141,   168,     2,     3,   174,   109,   146,    51,
+      51,   136,     5,   175,   109,     6,   177,    57,    75,     8,
+     179,   139,   143,    80,    81,    82,    83,    84,    85,    16,
+      17,    18,    19,   144,    20,    57,    21,    22,    23,    24,
+     151,    88,    58,   154,   160,   170,     1,   172,     7,   163,
+     147,   166,     0,    58,     0,     0,     2,     3,    87,     0,
+      88,     4,     0,     0,     5,     0,     0,     6,     0,     7,
+      58,     8,     0,     9,     0,    10,    11,    12,    13,    14,
+      15,    16,    17,    18,    19,     0,    20,     1,    21,    22,
+      23,    24,    25,    26,    27,    28,     0,     2,     3,     0,
+       0,     0,    67,     0,     0,     5,     0,     0,     6,     0,
+       0,     0,     8,    -1,    -1,    -1,    -1,    84,    85,     0,
+       0,     0,    16,    17,    18,    19,     1,    20,     0,    21,
+      22,    23,    24,    94,    95,    96,     2,     3,     0,    97,
+       0,     0,     0,     0,     5,     0,     0,     6,    87,     0,
+      88,     8,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,    16,    17,    18,    19,     0,    20,     0,    21,    22,
+      23,    24,    75,    76,    77,    78,    79,    80,    81,    82,
+      83,    84,    85,     0,     0,     0,     0,     0,    86,     0,
       75,    76,    77,    78,    79,    80,    81,    82,    83,    84,
-      85,     0,     0,     0,     0,     0,    87,     0,    88,     0,
-       0,     0,    87,     0,    88,     0,     0,   156,    75,    76,
+      85,    75,    76,    77,    78,    79,    80,    81,    82,    83,
+      84,    85,    87,   105,    88,     0,     0,   118,    75,    76,
       77,    78,    79,    80,    81,    82,    83,    84,    85,     0,
-      87,     0,    88,    75,    76,    77,    78,    79,    80,    81,
-      82,    83,    84,    85,     0,   158,     0,     0,     0,     0,
-       0,     0,     0,     0,     0,     0,   162,     0,    87,     0,
-      88,    75,    76,    77,    78,    79,    80,    81,    82,    83,
-      84,    85,     0,    87,     0,    88,     0,     0,     0,     0,
-       0,     0,     0,     0,     0,     0,   169,     0,    75,    76,
+      87,     0,    88,     0,     0,     0,   145,     0,     0,     0,
+       0,    87,     0,    88,    75,    76,    77,    78,    79,    80,
+      81,    82,    83,    84,    85,     0,     0,     0,    87,     0,
+      88,     0,     0,     0,     0,     0,     0,   148,    75,    76,
       77,    78,    79,    80,    81,    82,    83,    84,    85,     0,
-       0,    87,     0,    88,   178,    75,    76,    77,    78,    79,
-      80,    81,    82,    83,    84,    85,     0,     0,     0,     0,
+       0,     0,     0,     0,    87,     0,    88,     0,     0,     0,
+       0,   149,    75,    76,    77,    78,    79,    80,    81,    82,
+      83,    84,    85,     0,     0,     0,     0,     0,    87,     0,
+      88,     0,     0,     0,     0,     0,     0,     0,     0,   156,
+      75,    76,    77,    78,    79,    80,    81,    82,    83,    84,
+      85,     0,    87,     0,    88,     0,    75,    76,    77,    78,
+      79,    80,    81,    82,    83,    84,    85,   158,    75,    76,
+      77,    78,    79,    80,    81,    82,    83,    84,    85,     0,
+      87,   169,    88,     0,   171,    75,    76,    77,    78,    79,
+      80,    81,    82,    83,    84,    85,    87,     0,    88,     0,
        0,     0,    89,    90,    91,    92,    93,     0,    87,     0,
       88,    94,    95,    96,     0,     0,     0,    97,     0,     0,
        0,     0,     0,     0,     0,    87,     0,    88
@@ -790,58 +782,54 @@ static const yytype_int16 yytable[] =
 
 static const yytype_int16 yycheck[] =
 {
-       0,     1,    49,     6,    12,    13,     6,     4,    96,    22,
-      20,    25,    25,    13,   102,    30,    26,    14,    15,    49,
-      20,   109,     0,   165,    19,    22,   148,   115,    25,    42,
-      30,    19,    29,   175,    25,    43,    49,    45,    35,    35,
-     162,    56,    39,    40,    41,    42,    49,    44,   170,    46,
-      47,    48,    49,    20,    20,   143,    56,    57,    49,   181,
-      26,    26,    62,    30,     2,     3,   154,    23,    24,    25,
-       2,     3,    30,    29,    25,    75,    76,    77,    78,    79,
-      80,    81,    82,    83,    84,    85,    25,    87,    88,    25,
-     178,    91,    92,    93,     4,    49,    23,    97,    25,    49,
-      49,    26,    29,   103,    14,    15,    25,    28,    49,    19,
-      27,    45,    22,    25,   114,    25,    19,    27,    26,    29,
-      26,    31,    26,    33,    34,    35,    36,    37,    38,    39,
-      40,    41,    42,    32,    44,    49,    46,    47,    48,    49,
-      50,    51,    52,    53,    27,   145,    26,    26,   148,   111,
-       4,   153,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
-      14,    15,   162,   163,    -1,    -1,    -1,    -1,    22,    -1,
-     170,    25,    -1,    27,    -1,    29,    -1,    -1,    -1,    -1,
-      -1,   181,    -1,    -1,    -1,    39,    40,    41,    42,     4,
-      44,    -1,    46,    47,    48,    49,    -1,    -1,    -1,    14,
-      15,    -1,    -1,    -1,    19,    -1,    -1,    22,    -1,    -1,
-      25,    -1,     3,    -1,    29,    -1,    -1,     8,     9,    10,
-      11,    12,    13,    -1,    39,    40,    41,    42,     4,    44,
-      -1,    46,    47,    48,    49,    -1,    -1,    -1,    14,    15,
-      -1,    -1,    -1,    -1,    -1,    -1,    22,    -1,    -1,    25,
-      -1,    -1,    43,    29,    45,    -1,    -1,    -1,    -1,    -1,
-      -1,    -1,    -1,    39,    40,    41,    42,    -1,    44,    -1,
-      46,    47,    48,    49,     3,     4,     5,     6,     7,     8,
-       9,    10,    11,    12,    13,    -1,    -1,    -1,    -1,    -1,
-      19,    -1,     3,     4,     5,     6,     7,     8,     9,    10,
-      11,    12,    13,     3,     4,     5,     6,     7,     8,     9,
-      10,    11,    12,    13,    43,    26,    45,    -1,    -1,    -1,
-      20,     3,     4,     5,     6,     7,     8,     9,    10,    11,
-      12,    13,    43,    -1,    45,    -1,    -1,    19,    -1,    -1,
-      -1,    -1,    -1,    43,    -1,    45,     3,     4,     5,     6,
-       7,     8,     9,    10,    11,    12,    13,    -1,    -1,    -1,
-      -1,    43,    -1,    45,    21,    -1,     3,     4,     5,     6,
-       7,     8,     9,    10,    11,    12,    13,     8,     9,    10,
-      11,    12,    13,    -1,    -1,    -1,    43,    -1,    45,    26,
+       1,     6,    30,    22,    20,     6,    25,     8,    25,    64,
+      20,    49,    13,   165,    30,     4,    25,   148,   149,    20,
+      30,    20,   174,    42,    19,    14,    15,    26,    56,    25,
+      49,    25,    49,    22,    12,    13,    25,    19,    20,   170,
+      29,    96,    19,    23,    49,    25,    35,   102,   179,    29,
+      39,    40,    41,    42,     0,    44,    57,    46,    47,    48,
+      49,    62,    63,    64,    20,    43,    20,    45,     2,     3,
+      26,    35,    26,    49,    75,    76,    77,    78,    79,    80,
+      81,    82,    83,    84,    85,    26,    87,    88,   143,    25,
+      91,    92,    93,    26,     4,    96,    97,    20,    49,   154,
+      20,   102,   103,    26,    14,    15,    26,    20,   109,     2,
+       3,    49,    22,    26,    20,    25,   171,    27,     3,    29,
+      26,    49,    25,     8,     9,    10,    11,    12,    13,    39,
+      40,    41,    42,    28,    44,    27,    46,    47,    48,    49,
+      49,    45,   143,    25,   145,    32,     4,    49,    27,   150,
+     111,   153,    -1,   154,    -1,    -1,    14,    15,    43,    -1,
+      45,    19,    -1,    -1,    22,    -1,    -1,    25,    -1,    27,
+     171,    29,    -1,    31,    -1,    33,    34,    35,    36,    37,
+      38,    39,    40,    41,    42,    -1,    44,     4,    46,    47,
+      48,    49,    50,    51,    52,    53,    -1,    14,    15,    -1,
+      -1,    -1,    19,    -1,    -1,    22,    -1,    -1,    25,    -1,
+      -1,    -1,    29,     8,     9,    10,    11,    12,    13,    -1,
+      -1,    -1,    39,    40,    41,    42,     4,    44,    -1,    46,
+      47,    48,    49,    23,    24,    25,    14,    15,    -1,    29,
+      -1,    -1,    -1,    -1,    22,    -1,    -1,    25,    43,    -1,
+      45,    29,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
+      -1,    39,    40,    41,    42,    -1,    44,    -1,    46,    47,
+      48,    49,     3,     4,     5,     6,     7,     8,     9,    10,
+      11,    12,    13,    -1,    -1,    -1,    -1,    -1,    19,    -1,
        3,     4,     5,     6,     7,     8,     9,    10,    11,    12,
-      13,    -1,    -1,    -1,    -1,    -1,    43,    -1,    45,    -1,
-      -1,    -1,    43,    -1,    45,    -1,    -1,    30,     3,     4,
+      13,     3,     4,     5,     6,     7,     8,     9,    10,    11,
+      12,    13,    43,    26,    45,    -1,    -1,    19,     3,     4,
        5,     6,     7,     8,     9,    10,    11,    12,    13,    -1,
-      43,    -1,    45,     3,     4,     5,     6,     7,     8,     9,
-      10,    11,    12,    13,    -1,    30,    -1,    -1,    -1,    -1,
-      -1,    -1,    -1,    -1,    -1,    -1,    26,    -1,    43,    -1,
-      45,     3,     4,     5,     6,     7,     8,     9,    10,    11,
-      12,    13,    -1,    43,    -1,    45,    -1,    -1,    -1,    -1,
-      -1,    -1,    -1,    -1,    -1,    -1,    28,    -1,     3,     4,
+      43,    -1,    45,    -1,    -1,    -1,    21,    -1,    -1,    -1,
+      -1,    43,    -1,    45,     3,     4,     5,     6,     7,     8,
+       9,    10,    11,    12,    13,    -1,    -1,    -1,    43,    -1,
+      45,    -1,    -1,    -1,    -1,    -1,    -1,    26,     3,     4,
        5,     6,     7,     8,     9,    10,    11,    12,    13,    -1,
-      -1,    43,    -1,    45,    19,     3,     4,     5,     6,     7,
-       8,     9,    10,    11,    12,    13,    -1,    -1,    -1,    -1,
+      -1,    -1,    -1,    -1,    43,    -1,    45,    -1,    -1,    -1,
+      -1,    26,     3,     4,     5,     6,     7,     8,     9,    10,
+      11,    12,    13,    -1,    -1,    -1,    -1,    -1,    43,    -1,
+      45,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    30,
+       3,     4,     5,     6,     7,     8,     9,    10,    11,    12,
+      13,    -1,    43,    -1,    45,    -1,     3,     4,     5,     6,
+       7,     8,     9,    10,    11,    12,    13,    30,     3,     4,
+       5,     6,     7,     8,     9,    10,    11,    12,    13,    -1,
+      43,    28,    45,    -1,    19,     3,     4,     5,     6,     7,
+       8,     9,    10,    11,    12,    13,    43,    -1,    45,    -1,
       -1,    -1,    14,    15,    16,    17,    18,    -1,    43,    -1,
       45,    23,    24,    25,    -1,    -1,    -1,    29,    -1,    -1,
       -1,    -1,    -1,    -1,    -1,    43,    -1,    45
@@ -855,21 +843,21 @@ static const yytype_int8 yystos[] =
       33,    34,    35,    36,    37,    38,    39,    40,    41,    42,
       44,    46,    47,    48,    49,    50,    51,    52,    53,    57,
       58,    59,    60,    61,    62,    63,    64,    65,    66,    71,
-      74,    76,    79,    81,    82,    84,    86,    87,    60,    25,
+      74,    76,    79,    81,    82,    83,    84,    85,    60,    25,
       64,    66,    64,    49,    60,    76,    75,    27,    60,    70,
-      72,    73,    25,    83,    85,    25,    49,    19,    60,    19,
+      72,    73,    25,    25,    25,    25,    49,    19,    60,    19,
       19,    49,    60,     0,    59,     3,     4,     5,     6,     7,
        8,     9,    10,    11,    12,    13,    19,    43,    45,    14,
       15,    16,    17,    18,    23,    24,    25,    29,    67,    68,
       69,    23,    25,    29,    76,    26,    26,    59,    60,    20,
-      30,    20,    30,    60,    25,    25,    78,    25,    19,    60,
+      30,    20,    30,    60,    60,    70,    78,    25,    19,    60,
       60,    60,    60,    60,    60,    60,    60,    60,    60,    60,
       60,    60,    60,    60,    60,    49,    49,    70,    60,    49,
-      70,    60,    26,    25,    28,    21,    70,    73,    26,    60,
-      70,    49,    80,    77,    25,    26,    30,    26,    30,    70,
-      60,    58,    26,    19,    20,    26,    80,    70,    26,    28,
-      32,    58,    60,    49,    74,    26,    26,    58,    19,    74,
-      70,    26,    58
+      70,    60,    26,    25,    28,    21,    60,    73,    26,    26,
+      19,    49,    80,    77,    25,    26,    30,    26,    30,    70,
+      60,    58,    58,    60,    20,    26,    80,    70,    26,    28,
+      32,    19,    49,    74,    26,    26,    58,    70,    74,    26,
+      58
 };
 
 /* YYR1[RULE-NUM] -- Symbol kind of the left-hand side of rule RULE-NUM.  */
@@ -883,8 +871,8 @@ static const yytype_int8 yyr1[] =
       64,    65,    65,    65,    65,    66,    66,    66,    67,    67,
       68,    69,    70,    70,    70,    71,    71,    72,    72,    73,
       75,    74,    77,    76,    78,    76,    79,    79,    79,    79,
-      79,    79,    80,    80,    80,    81,    81,    83,    82,    85,
-      84,    86,    86,    87,    87,    87,    87
+      79,    79,    80,    80,    80,    81,    81,    82,    83,    84,
+      84,    85,    85,    85,    85
 };
 
 /* YYR2[RULE-NUM] -- Number of symbols on the right-hand side of rule RULE-NUM.  */
@@ -898,8 +886,8 @@ static const yytype_int8 yyr2[] =
        1,     3,     4,     3,     4,     4,     2,     6,     1,     1,
        3,     5,     1,     3,     0,     3,     3,     1,     3,     5,
        0,     4,     0,     7,     0,     6,     1,     1,     1,     1,
-       1,     1,     1,     3,     0,     5,     7,     0,     6,     0,
-      10,     3,     2,     1,     1,     1,     1
+       1,     1,     1,     3,     0,     5,     7,     5,     9,     3,
+       2,     1,     1,     1,     1
 };
 
 
@@ -1751,7 +1739,7 @@ yyreduce:
                         {
                                 fprintf(yyout, "[-] Reduced: program -> stmt_list\n");
                         }
-#line 1755 "out/parser.tab.cpp"
+#line 1743 "out/parser.tab.cpp"
     break;
 
   case 3: /* stmt: expr SEMICOLON  */
@@ -1759,7 +1747,7 @@ yyreduce:
                         {
                                 fprintf(yyout, "[-] Reduced: stmt -> expr SEMICOLON\n");
                         }
-#line 1763 "out/parser.tab.cpp"
+#line 1751 "out/parser.tab.cpp"
     break;
 
   case 4: /* stmt: ifstmt  */
@@ -1767,7 +1755,7 @@ yyreduce:
                         {
                                 fprintf(yyout, "[-] Reduced: stmt -> ifstmt\n");
                         }
-#line 1771 "out/parser.tab.cpp"
+#line 1759 "out/parser.tab.cpp"
     break;
 
   case 5: /* stmt: whilestmt  */
@@ -1775,7 +1763,7 @@ yyreduce:
                         {
                                 fprintf(yyout, "[-] Reduced: stmt -> whilestmt\n");
                         }
-#line 1779 "out/parser.tab.cpp"
+#line 1767 "out/parser.tab.cpp"
     break;
 
   case 6: /* stmt: forstmt  */
@@ -1783,811 +1771,894 @@ yyreduce:
                         {
                                 fprintf(yyout, "[-] Reduced: stmt -> forstmt\n");
                         }
-#line 1787 "out/parser.tab.cpp"
+#line 1775 "out/parser.tab.cpp"
     break;
 
   case 7: /* stmt: returnstmt  */
 #line 154 "src/parser.y"
                         {       
-                                if (!inFunction) {
-                                    myerror(&(yylsp[0]), "Error: Return statement outside of function");
-                                }
+                                if (funcStack.empty()) myerror(&(yylsp[0]), "Error: Return statement outside of function");
                                 fprintf(yyout, "[-] Reduced: stmt -> returnstmt\n");
                         }
-#line 1798 "out/parser.tab.cpp"
+#line 1784 "out/parser.tab.cpp"
     break;
 
   case 8: /* stmt: BREAK SEMICOLON  */
-#line 161 "src/parser.y"
+#line 159 "src/parser.y"
                                 {       
-                                        if (rabbitHole < 1) {
-                                            myerror(&(yylsp[-1]), "Error: Break statement outside of loop");
-                                        }
+                                        if (rabbitHole < 1)  myerror(&(yylsp[-1]), "Error: Break statement outside of loop");
                                         fprintf(yyout, "[-] Reduced: stmt -> BREAK SEMICOLON\n");
                                 }
-#line 1809 "out/parser.tab.cpp"
+#line 1793 "out/parser.tab.cpp"
     break;
 
   case 9: /* stmt: CONTINUE SEMICOLON  */
-#line 168 "src/parser.y"
+#line 164 "src/parser.y"
                                 {       
-                                        if (rabbitHole < 1) {
-                                            myerror(&(yylsp[-1]), "Error: Continue statement outside of loop");
-                                        }
+                                        if (rabbitHole < 1) myerror(&(yylsp[-1]), "Error: Continue statement outside of loop");
                                         fprintf(yyout, "[-] Reduced: stmt -> CONTINUE SEMICOLON\n");
                                 }
-#line 1820 "out/parser.tab.cpp"
+#line 1802 "out/parser.tab.cpp"
     break;
 
   case 10: /* stmt: block  */
-#line 174 "src/parser.y"
+#line 168 "src/parser.y"
                                 {       
                                         fprintf(yyout, "[-] Reduced: stmt -> block\n");
                                 }
-#line 1828 "out/parser.tab.cpp"
+#line 1810 "out/parser.tab.cpp"
     break;
 
   case 11: /* stmt: funcdef  */
-#line 178 "src/parser.y"
+#line 172 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: stmt -> funcdef\n");
                                 }
-#line 1836 "out/parser.tab.cpp"
+#line 1818 "out/parser.tab.cpp"
     break;
 
   case 12: /* stmt: SEMICOLON  */
-#line 182 "src/parser.y"
+#line 176 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: stmt -> SEMICOLON\n");
                                 }
-#line 1844 "out/parser.tab.cpp"
+#line 1826 "out/parser.tab.cpp"
     break;
 
   case 13: /* stmt: errors  */
-#line 186 "src/parser.y"
+#line 180 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: stmt -> errors\n");
                                 }
-#line 1852 "out/parser.tab.cpp"
+#line 1834 "out/parser.tab.cpp"
     break;
 
   case 14: /* stmt_list: stmt stmt_list  */
-#line 191 "src/parser.y"
-                                {
+#line 185 "src/parser.y"
+                               {
                                         fprintf(yyout, "[-] Reduced: stmt_list -> stmt stmt_list\n");
                                 }
-#line 1860 "out/parser.tab.cpp"
+#line 1842 "out/parser.tab.cpp"
     break;
 
   case 15: /* stmt_list: %empty  */
-#line 195 "src/parser.y"
-                                {
+#line 189 "src/parser.y"
+                                {       
+                                        fprintf(yyout, "%s\n", yylval.str_val);
                                         fprintf(yyout, "[-] Reduced: stmt_list -> /* empty */\n");
                                 }
-#line 1868 "out/parser.tab.cpp"
+#line 1851 "out/parser.tab.cpp"
     break;
 
   case 16: /* expr: assignexpr  */
-#line 200 "src/parser.y"
+#line 195 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: expr -> assignexpr\n");
                                 }
-#line 1876 "out/parser.tab.cpp"
+#line 1859 "out/parser.tab.cpp"
     break;
 
   case 17: /* expr: expr PLUS expr  */
-#line 204 "src/parser.y"
-                                {
+#line 199 "src/parser.y"
+                                {       
                                         fprintf(yyout, "[-] Reduced: expr -> expr PLUS expr\n");
                                 }
-#line 1884 "out/parser.tab.cpp"
+#line 1867 "out/parser.tab.cpp"
     break;
 
   case 18: /* expr: expr MINUS expr  */
-#line 208 "src/parser.y"
+#line 203 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: expr -> expr MINUS expr\n");
                                 }
-#line 1892 "out/parser.tab.cpp"
+#line 1875 "out/parser.tab.cpp"
     break;
 
   case 19: /* expr: expr MULTIPLY expr  */
-#line 212 "src/parser.y"
+#line 207 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: expr -> expr MULTIPLY expr\n");
                                 }
-#line 1900 "out/parser.tab.cpp"
+#line 1883 "out/parser.tab.cpp"
     break;
 
   case 20: /* expr: expr DIVIDE expr  */
-#line 216 "src/parser.y"
+#line 211 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: expr -> expr DIVIDE expr\n");
                                 }
-#line 1908 "out/parser.tab.cpp"
+#line 1891 "out/parser.tab.cpp"
     break;
 
   case 21: /* expr: expr MODULO expr  */
-#line 220 "src/parser.y"
+#line 215 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: expr -> expr MODULO expr\n");
                                 }
-#line 1916 "out/parser.tab.cpp"
+#line 1899 "out/parser.tab.cpp"
     break;
 
   case 22: /* expr: expr GREATER_THAN expr  */
-#line 224 "src/parser.y"
+#line 219 "src/parser.y"
                                         {
                                                 fprintf(yyout, "[-] Reduced: expr -> expr GREATER_THAN expr\n");
                                         }
-#line 1924 "out/parser.tab.cpp"
+#line 1907 "out/parser.tab.cpp"
     break;
 
   case 23: /* expr: expr LESS_THAN expr  */
-#line 228 "src/parser.y"
+#line 223 "src/parser.y"
                                         {
                                                 fprintf(yyout, "[-] Reduced: expr -> expr LESS_THAN expr\n");
                                         }
-#line 1932 "out/parser.tab.cpp"
+#line 1915 "out/parser.tab.cpp"
     break;
 
   case 24: /* expr: expr GREATER_THAN_EQUAL expr  */
-#line 232 "src/parser.y"
+#line 227 "src/parser.y"
                                         {
                                                 fprintf(yyout, "[-] Reduced: expr -> expr GREATER_THAN_EQUAL expr\n");
                                         }
-#line 1940 "out/parser.tab.cpp"
+#line 1923 "out/parser.tab.cpp"
     break;
 
   case 25: /* expr: expr LESS_THAN_EQUAL expr  */
-#line 236 "src/parser.y"
+#line 231 "src/parser.y"
                                         {
                                                 fprintf(yyout, "[-] Reduced: expr -> expr LESS_THAN_EQUAL expr\n");
                                         }
-#line 1948 "out/parser.tab.cpp"
+#line 1931 "out/parser.tab.cpp"
     break;
 
   case 26: /* expr: expr EQUAL expr  */
-#line 240 "src/parser.y"
+#line 235 "src/parser.y"
                                         {
                                                 fprintf(yyout, "[-] Reduced: expr -> expr EQUAL expr\n");
                                         }
-#line 1956 "out/parser.tab.cpp"
+#line 1939 "out/parser.tab.cpp"
     break;
 
   case 27: /* expr: expr NOT_EQUAL expr  */
-#line 244 "src/parser.y"
+#line 239 "src/parser.y"
                                         {
                                                 fprintf(yyout, "[-] Reduced: expr -> expr NOT_EQUAL expr\n");
                                         }
-#line 1964 "out/parser.tab.cpp"
+#line 1947 "out/parser.tab.cpp"
     break;
 
   case 28: /* expr: expr AND expr  */
-#line 248 "src/parser.y"
+#line 243 "src/parser.y"
                                         {
                                                 fprintf(yyout, "[-] Reduced: expr -> expr AND expr\n");
                                         }
-#line 1972 "out/parser.tab.cpp"
+#line 1955 "out/parser.tab.cpp"
     break;
 
   case 29: /* expr: expr OR expr  */
-#line 252 "src/parser.y"
+#line 247 "src/parser.y"
                                         {
                                                 fprintf(yyout, "[-] Reduced: expr -> expr OR expr\n");
                                         }
-#line 1980 "out/parser.tab.cpp"
+#line 1963 "out/parser.tab.cpp"
     break;
 
   case 30: /* expr: term  */
-#line 256 "src/parser.y"
+#line 251 "src/parser.y"
                                         {
                                                 fprintf(yyout, "[-] Reduced: expr -> term\n");
                                         }
-#line 1988 "out/parser.tab.cpp"
+#line 1971 "out/parser.tab.cpp"
     break;
 
   case 31: /* term: LEFT_PARENTHESIS expr RIGHT_PARENTHESIS  */
-#line 261 "src/parser.y"
+#line 256 "src/parser.y"
                                                 {
                                                         fprintf(yyout, "[-] Reduced: term -> LEFT_PARENTHESIS expr RIGHT_PARENTHESIS\n");
                                                 }
-#line 1996 "out/parser.tab.cpp"
+#line 1979 "out/parser.tab.cpp"
     break;
 
   case 32: /* term: MINUS expr  */
-#line 265 "src/parser.y"
+#line 260 "src/parser.y"
                                                 {
 
                                                         
                                                         fprintf(yyout, "[-] Reduced: term -> MINUS expr\n");
                                                 }
-#line 2006 "out/parser.tab.cpp"
+#line 1989 "out/parser.tab.cpp"
     break;
 
   case 33: /* term: NOT expr  */
-#line 271 "src/parser.y"
+#line 266 "src/parser.y"
                                                 {
                                                         fprintf(yyout, "[-] Reduced: term -> NOT expr\n");
                                                 }
-#line 2014 "out/parser.tab.cpp"
+#line 1997 "out/parser.tab.cpp"
     break;
 
   case 34: /* term: INCREMENT lvalue  */
-#line 275 "src/parser.y"
-                                                {
+#line 270 "src/parser.y"
+                                                {       
+                                                        SymEntry* found = symTable.lookup((yyvsp[0].str_val));
+                                                        if (found && found->type == FUNC) myerror(&(yylsp[-1]), "Error: Function is not l-value");
                                                         fprintf(yyout, "[-] Reduced: term -> INCREMENT lvalue\n");
                                                 }
-#line 2022 "out/parser.tab.cpp"
+#line 2007 "out/parser.tab.cpp"
     break;
 
   case 35: /* term: lvalue INCREMENT  */
-#line 279 "src/parser.y"
-                                                {
+#line 276 "src/parser.y"
+                                                {       
+                                                        SymEntry* found = symTable.lookup((yyvsp[-1].str_val));
+                                                        if (found && found->type == FUNC) myerror(&(yylsp[-1]), "Error: Function call is not l-value");
                                                         fprintf(yyout, "[-] Reduced: term -> lvalue INCREMENT\n");
                                                 }
-#line 2030 "out/parser.tab.cpp"
+#line 2017 "out/parser.tab.cpp"
     break;
 
   case 36: /* term: DECREMENT lvalue  */
-#line 283 "src/parser.y"
-                                                {
+#line 282 "src/parser.y"
+                                                {       
+                                                        SymEntry* found = symTable.lookup((yyvsp[0].str_val));
+                                                        if (found && found->type == FUNC) myerror(&(yylsp[-1]), "Error: Function call is not l-value");
                                                         fprintf(yyout, "[-] Reduced: term -> DECREMENT lvalue\n");
                                                 }
-#line 2038 "out/parser.tab.cpp"
+#line 2027 "out/parser.tab.cpp"
     break;
 
   case 37: /* term: lvalue DECREMENT  */
-#line 287 "src/parser.y"
-                                                {
+#line 288 "src/parser.y"
+                                                {       
+                                                        SymEntry* found = symTable.lookup((yyvsp[-1].str_val));
+                                                        if (found && found->type == FUNC) myerror(&(yylsp[-1]), "Error: Function call is not l-value");
                                                         fprintf(yyout, "[-] Reduced: term -> lvalue DECREMENT\n");
                                                 }
-#line 2046 "out/parser.tab.cpp"
+#line 2037 "out/parser.tab.cpp"
     break;
 
   case 38: /* term: primary  */
-#line 291 "src/parser.y"
+#line 294 "src/parser.y"
                                                 {
                                                         fprintf(yyout, "[-] Reduced: term -> primary\n");
                                                 }
-#line 2054 "out/parser.tab.cpp"
+#line 2045 "out/parser.tab.cpp"
     break;
 
   case 39: /* assignexpr: lvalue ASSIGN expr  */
-#line 296 "src/parser.y"
+#line 299 "src/parser.y"
                                                 {       
                                                         SymEntry* found = symTable.lookup((yyvsp[-2].str_val));
+
                                                         if (!found) {
-                                                                SymEntry* var = new SymEntry;
-                                                                var->name = (yyvsp[-2].str_val);
-                                                                var->type = VAR;
-                                                                var->scope = symTable.getScope();
-                                                                var->line = (yylsp[-2]).first_line;
-                                                                var->isActive = true;
+                                                                SymEntry* entry = new SymEntry;
+                                                                entry->name = (yyvsp[-2].str_val);
+                                                                entry->type = VAR;
+                                                                entry->scope = symTable.getScope();
+                                                                entry->line = yylineno;
+                                                                entry->isActive = true;
 
-                                                                int res = symTable.insert(var);
-                                                                if (res == 3) myerror(&(yylsp[-2]), "Error: Cannot shadow lib function.\n");
+                                                                int res = symTable.insert(entry);
 
-                                                                delete var;
-                                                        } else if (found->type == FUNC) {
-                                                                myerror(&(yylsp[-2]), "Error: Cannot assign to function.\n");
+                                                                if (res == 2) myerror(&(yylsp[-2]), "Error: Variable already declared in this scope.");
+                                                                if (res == 3) myerror(&(yylsp[-2]), "Error: Cannot shadow lib functions.");
+                                                                if (res == 4) myerror(&(yylsp[-2]), "Error: Cannot shadow user-active functions");
+
+
+                                                        } else {
+                                                                if (found->type == FUNC) {
+                                                                        myerror(&(yylsp[-2]), "Error: Cannot assign to function (token cannot be used as l-value).");
+                                                                }
                                                         }
+
                                                         fprintf(yyout, "[-] Reduced: assignexpr -> lvalue ASSIGN expr\n");
                                                 }
-#line 2078 "out/parser.tab.cpp"
+#line 2076 "out/parser.tab.cpp"
     break;
 
   case 40: /* assignexpr: lvalue PLUS_ASSIGN expr  */
-#line 316 "src/parser.y"
-                                                {
+#line 326 "src/parser.y"
+                                                {       
+                                                         SymEntry* found = symTable.lookup((yyvsp[-2].str_val));
+
+                                                        if (!found) {
+                                                                SymEntry* entry = new SymEntry;
+                                                                entry->name = (yyvsp[-2].str_val);
+                                                                entry->type = VAR;
+                                                                entry->scope = symTable.getScope();
+                                                                entry->line = yylineno;
+                                                                entry->isActive = true;
+
+                                                                int res = symTable.insert(entry);
+
+                                                                if (res == 2) myerror(&(yylsp[-2]), "Error: Variable already declared in this scope.");
+                                                                if (res == 3) myerror(&(yylsp[-2]), "Error: Cannot shadow lib functions.");
+                                                                if (res == 4) myerror(&(yylsp[-2]), "Error: Cannot shadow user-active functions");
+
+
+                                                        } else {
+                                                                if (found->type == FUNC) {
+                                                                        myerror(&(yylsp[-2]), "Error: Cannot assign to function (token cannot be used as l-value).");
+                                                                }
+                                                        }
+                                                        
+                                                        fprintf(yyout, "[-] Reduced: assignexpr -> lvalue ASSIGN expr\n");
                                                         fprintf(yyout, "[-] Reduced: assignexpr -> lvalue PLUS_ASSIGN expr\n");
                                                 }
-#line 2086 "out/parser.tab.cpp"
+#line 2108 "out/parser.tab.cpp"
     break;
 
   case 41: /* assignexpr: lvalue MINUS_ASSIGN expr  */
-#line 320 "src/parser.y"
-                                                {
+#line 354 "src/parser.y"
+                                                {       
+                                                         SymEntry* found = symTable.lookup((yyvsp[-2].str_val));
+
+                                                        // when found I check if I can insert it
+                                                        if (!found) {
+                                                                SymEntry* entry = new SymEntry;
+                                                                entry->name = (yyvsp[-2].str_val);
+                                                                entry->type = VAR;
+                                                                entry->scope = symTable.getScope();
+                                                                entry->line = yylineno;
+                                                                entry->isActive = true;
+
+                                                                int res = symTable.insert(entry);
+
+                                                                if (res == 2) myerror(&(yylsp[-2]), "Error: Variable already declared in this scope.");
+                                                                if (res == 3) myerror(&(yylsp[-2]), "Error: Cannot shadow lib functions.");
+                                                                if (res == 4) myerror(&(yylsp[-2]), "Error: Cannot shadow user-active functions");
+
+
+
+                                                        } else {
+                                                                // if not found I check if it is a function
+                                                                if (found->type == FUNC) {
+                                                                        myerror(&(yylsp[-2]), "Error: Cannot assign to function (token cannot be used as l-value).");
+                                                                }
+                                                        }
+                                                        
+                                                        fprintf(yyout, "[-] Reduced: assignexpr -> lvalue ASSIGN expr\n");
                                                         fprintf(yyout, "[-] Reduced: assignexpr -> lvalue MINUS_ASSIGN expr\n");
                                                 }
-#line 2094 "out/parser.tab.cpp"
+#line 2143 "out/parser.tab.cpp"
     break;
 
   case 42: /* primary: lvalue  */
-#line 325 "src/parser.y"
+#line 386 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: primary -> lvalue\n");
                                 }
-#line 2102 "out/parser.tab.cpp"
+#line 2151 "out/parser.tab.cpp"
     break;
 
   case 43: /* primary: call  */
-#line 329 "src/parser.y"
+#line 390 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: primary -> call\n");
                                 }
-#line 2110 "out/parser.tab.cpp"
+#line 2159 "out/parser.tab.cpp"
     break;
 
   case 44: /* primary: objectdef  */
-#line 333 "src/parser.y"
+#line 394 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: primary -> objectdef\n");
                                 }
-#line 2118 "out/parser.tab.cpp"
+#line 2167 "out/parser.tab.cpp"
     break;
 
   case 45: /* primary: LEFT_PARENTHESIS funcdef RIGHT_PARENTHESIS  */
-#line 337 "src/parser.y"
+#line 398 "src/parser.y"
                                                         {
                                                             fprintf(yyout, "[-] Reduced: primary -> LEFT_PARENTHESIS funcdef RIGHT_PARENTHESIS\n");
                                                         }
-#line 2126 "out/parser.tab.cpp"
+#line 2175 "out/parser.tab.cpp"
     break;
 
   case 46: /* primary: const  */
-#line 340 "src/parser.y"
+#line 401 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: primary -> const\n");
                                 }
-#line 2134 "out/parser.tab.cpp"
+#line 2183 "out/parser.tab.cpp"
     break;
 
   case 47: /* lvalue: IDENTIFIER  */
-#line 345 "src/parser.y"
+#line 406 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: lvalue -> IDENTIFIER\n");
                                 }
-#line 2142 "out/parser.tab.cpp"
+#line 2191 "out/parser.tab.cpp"
     break;
 
   case 48: /* lvalue: LOCAL IDENTIFIER  */
-#line 348 "src/parser.y"
-                                {
+#line 409 "src/parser.y"
+                                {       
+                                        SymEntry* found = symTable.lookup((yyvsp[0].str_val));
+                                        if (found) myerror(&(yylsp[-1]), "Error: Variable already declared in this scope.");
+
+                                        
                                         fprintf(yyout, "[-] Reduced: lvalue -> LOCAL IDENTIFIER\n");
                                 }
-#line 2150 "out/parser.tab.cpp"
+#line 2203 "out/parser.tab.cpp"
     break;
 
   case 49: /* lvalue: DOUBLE_COLON IDENTIFIER  */
-#line 352 "src/parser.y"
-                                        {
+#line 417 "src/parser.y"
+                                        {       
+                                                SymEntry* found = symTable.lookup((yyvsp[0].str_val), 0);
+                                                if (!found) myerror(&(yylsp[-1]), "Error: Variable not declared in this scope.");
                                                 fprintf(yyout, "[-] Reduced: lvalue -> DOUBLE_COLON IDENTIFIER\n");
                                         }
-#line 2158 "out/parser.tab.cpp"
+#line 2213 "out/parser.tab.cpp"
     break;
 
   case 50: /* lvalue: member  */
-#line 356 "src/parser.y"
+#line 423 "src/parser.y"
                                         {
                                                 fprintf(yyout, "[-] Reduced: lvalue -> member\n");
                                         }
-#line 2166 "out/parser.tab.cpp"
+#line 2221 "out/parser.tab.cpp"
     break;
 
   case 51: /* member: lvalue DOT IDENTIFIER  */
-#line 361 "src/parser.y"
+#line 428 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: member -> lvalue DOT IDENTIFIER\n");
                                 }
-#line 2174 "out/parser.tab.cpp"
+#line 2229 "out/parser.tab.cpp"
     break;
 
   case 52: /* member: lvalue LEFT_BRACKET expr RIGHT_BRACKET  */
-#line 365 "src/parser.y"
+#line 432 "src/parser.y"
                                                         {
                                                                 fprintf(yyout, "[-] Reduced: member -> lvalue LEFT_BRACKET expr RIGHT_BRACKET\n");
                                                         }
-#line 2182 "out/parser.tab.cpp"
+#line 2237 "out/parser.tab.cpp"
     break;
 
   case 53: /* member: call DOT IDENTIFIER  */
-#line 369 "src/parser.y"
+#line 436 "src/parser.y"
                                                         {
                                                                 fprintf(yyout, "[-] Reduced: member -> call DOT IDENTIFIER\n");
                                                         }
-#line 2190 "out/parser.tab.cpp"
+#line 2245 "out/parser.tab.cpp"
     break;
 
   case 54: /* member: call LEFT_BRACKET expr RIGHT_BRACKET  */
-#line 373 "src/parser.y"
+#line 440 "src/parser.y"
                                                         {
                                                                 fprintf(yyout, "[-] Reduced: member -> call LEFT_BRACKET expr RIGHT_BRACKET\n");
                                                         }
-#line 2198 "out/parser.tab.cpp"
+#line 2253 "out/parser.tab.cpp"
     break;
 
   case 55: /* call: call LEFT_PARENTHESIS elist RIGHT_PARENTHESIS  */
-#line 378 "src/parser.y"
+#line 445 "src/parser.y"
                                                         {
                                                                 fprintf(yyout, "[-] Reduced: call -> call LEFT_PARENTHESIS elist RIGHT_PARENTHESIS\n");
                                                         }
-#line 2206 "out/parser.tab.cpp"
+#line 2261 "out/parser.tab.cpp"
     break;
 
   case 56: /* call: lvalue callsuffix  */
-#line 382 "src/parser.y"
+#line 449 "src/parser.y"
                                                         {
                                                                 fprintf(yyout, "[-] Reduced: call -> lvalue callsuffix\n");
                                                         }
-#line 2214 "out/parser.tab.cpp"
+#line 2269 "out/parser.tab.cpp"
     break;
 
   case 57: /* call: LEFT_PARENTHESIS funcdef RIGHT_PARENTHESIS LEFT_PARENTHESIS elist RIGHT_PARENTHESIS  */
-#line 386 "src/parser.y"
+#line 453 "src/parser.y"
                                                                                                 {
                                                                                                     fprintf(yyout, "[-] Reduced: call -> LEFT_PARENTHESIS funcdef RIGHT_PARENTHESIS LEFT_PARENTHESIS elist RIGHT_PARENTHESIS\n");
                                                                                                 }
-#line 2222 "out/parser.tab.cpp"
+#line 2277 "out/parser.tab.cpp"
     break;
 
   case 58: /* callsuffix: normcall  */
-#line 391 "src/parser.y"
+#line 458 "src/parser.y"
                                 {
                                     fprintf(yyout, "[-] Reduced: callsuffix -> normcall\n");
                                 }
-#line 2230 "out/parser.tab.cpp"
+#line 2285 "out/parser.tab.cpp"
     break;
 
   case 59: /* callsuffix: methodcall  */
-#line 395 "src/parser.y"
+#line 462 "src/parser.y"
                                 {
                                     fprintf(yyout, "[-] Reduced: callsuffix -> methodcall\n");
                                 }
-#line 2238 "out/parser.tab.cpp"
+#line 2293 "out/parser.tab.cpp"
     break;
 
   case 60: /* normcall: LEFT_PARENTHESIS elist RIGHT_PARENTHESIS  */
-#line 400 "src/parser.y"
+#line 467 "src/parser.y"
                                                         {
                                                             fprintf(yyout, "[-] Reduced: normcall -> LEFT_PARENTHESIS elist RIGHT_PARENTHESIS\n");
                                                         }
-#line 2246 "out/parser.tab.cpp"
+#line 2301 "out/parser.tab.cpp"
     break;
 
   case 61: /* methodcall: DOUBLE_DOT IDENTIFIER LEFT_PARENTHESIS elist RIGHT_PARENTHESIS  */
-#line 405 "src/parser.y"
+#line 472 "src/parser.y"
                                                                                 {
                                                                                     fprintf(yyout, "[-] Reduced: methodcall -> DOUBLE_DOT IDENTIFIER LEFT_PARENTHESIS elist RIGHT_PARENTHESIS\n");
                                                                                 }
-#line 2254 "out/parser.tab.cpp"
+#line 2309 "out/parser.tab.cpp"
     break;
 
   case 62: /* elist: expr  */
-#line 410 "src/parser.y"
+#line 477 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: elist -> expr\n");
                                 }
-#line 2262 "out/parser.tab.cpp"
+#line 2317 "out/parser.tab.cpp"
     break;
 
-  case 63: /* elist: expr COMMA elist  */
-#line 414 "src/parser.y"
+  case 63: /* elist: elist COMMA expr  */
+#line 481 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: elist -> expr COMMA elist\n");
                                 }
-#line 2270 "out/parser.tab.cpp"
+#line 2325 "out/parser.tab.cpp"
     break;
 
   case 64: /* elist: %empty  */
-#line 418 "src/parser.y"
+#line 485 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: elist -> /* empty */\n");
                                 }
-#line 2278 "out/parser.tab.cpp"
+#line 2333 "out/parser.tab.cpp"
     break;
 
   case 65: /* objectdef: LEFT_BRACKET elist RIGHT_BRACKET  */
-#line 423 "src/parser.y"
+#line 490 "src/parser.y"
                                                 {
                                                     fprintf(yyout, "[-] Reduced: objectdef -> LEFT_BRACKET elist RIGHT_BRACKET\n");
                                                 }
-#line 2286 "out/parser.tab.cpp"
+#line 2341 "out/parser.tab.cpp"
     break;
 
   case 66: /* objectdef: LEFT_BRACKET indexed RIGHT_BRACKET  */
-#line 427 "src/parser.y"
+#line 494 "src/parser.y"
                                                 {
                                                     fprintf(yyout, "[-] Reduced: objectdef -> LEFT_BRACKET indexed RIGHT_BRACKET\n");
                                                 }
-#line 2294 "out/parser.tab.cpp"
+#line 2349 "out/parser.tab.cpp"
     break;
 
   case 67: /* indexed: indexedelem  */
-#line 432 "src/parser.y"
+#line 499 "src/parser.y"
                                                 {
                                                     fprintf(yyout, "[-] Reduced: indexed -> indexedelem\n");
                                                 }
-#line 2302 "out/parser.tab.cpp"
+#line 2357 "out/parser.tab.cpp"
     break;
 
   case 68: /* indexed: indexed COMMA indexedelem  */
-#line 436 "src/parser.y"
+#line 503 "src/parser.y"
                                                 {
                                                     fprintf(yyout, "[-] Reduced: indexed -> indexed COMMA indexedelem\n");
                                                 }
-#line 2310 "out/parser.tab.cpp"
+#line 2365 "out/parser.tab.cpp"
     break;
 
   case 69: /* indexedelem: LEFT_BRACE expr COLON expr RIGHT_BRACE  */
-#line 441 "src/parser.y"
+#line 508 "src/parser.y"
                                                         {
                                                             fprintf(yyout, "[-] Reduced: indexedelem -> LEFT_BRACE expr COLON expr RIGHT_BRACE\n");
                                                         }
-#line 2318 "out/parser.tab.cpp"
+#line 2373 "out/parser.tab.cpp"
     break;
 
   case 70: /* $@1: %empty  */
-#line 446 "src/parser.y"
-                        {     
-                                if (!inFunction) symTable.enter_scope();
+#line 513 "src/parser.y"
+                        { 
+                                if (!skipBlockScope) symTable.enter_scope(); 
                         }
-#line 2326 "out/parser.tab.cpp"
+#line 2381 "out/parser.tab.cpp"
     break;
 
   case 71: /* block: LEFT_BRACE $@1 stmt_list RIGHT_BRACE  */
-#line 448 "src/parser.y"
-                                                {       
-                                                        symTable.exit_scope();
+#line 515 "src/parser.y"
+                                                {
+                                                        symTable.exit_scope();      
                                                         fprintf(yyout, "[-] Reduced: block -> LEFT_BRACE stmt_list RIGHT_BRACE\n");
                                                 }
-#line 2335 "out/parser.tab.cpp"
+#line 2390 "out/parser.tab.cpp"
     break;
 
   case 72: /* $@2: %empty  */
-#line 454 "src/parser.y"
-                                                                                        {       
-                                                                                                SymEntry* func = new SymEntry;
-                                                                                                func->name = (yyvsp[-1].str_val);
-                                                                                                func->type = FUNC;
-                                                                                                func->scope = symTable.getScope();
-                                                                                                func->line = (yylsp[-1]).first_line;
-                                                                                                func->isActive = true;
-
-                                                                                                int res = symTable.insert(func);
-                                                                                                if (res == 2) myerror(&(yylsp[-1]), "Error: Redeclaration of Identifier in the same scope.\n");
-                                                                                                if (res == 3) myerror(&(yylsp[-1]), "Error: Cannot shadow lib function.\n");
-
-                                                                                                delete func;
-                                                                                                symTable.enter_scope();
-                                                                                                inFunction = true;
-
-                                                                                                fprintf(yyout, "[-] Reduced: funcdef -> FUNCTION IDENTIFIER LEFT_PARENTHESIS idlist RIGHT_PARENTHESIS block\n");
-                                                                                        }
-#line 2358 "out/parser.tab.cpp"
-    break;
-
-  case 73: /* funcdef: FUNCTION IDENTIFIER LEFT_PARENTHESIS $@2 idlist RIGHT_PARENTHESIS block  */
-#line 473 "src/parser.y"
-                                                                                        {        
-                                                                                                symTable.exit_scope();
-                                                                                                inFunction = false;
-                                                                                        }
-#line 2367 "out/parser.tab.cpp"
-    break;
-
-  case 74: /* $@3: %empty  */
-#line 477 "src/parser.y"
-                                        {       
+#line 521 "src/parser.y"
+                                              {
                                                 SymEntry* func = new SymEntry;
-                                                func->name = "Anonymous";
+                                                func->name = (yyvsp[-1].str_val);
                                                 func->type = FUNC;
                                                 func->scope = symTable.getScope();
-                                                func->line = (yylsp[-1]).first_line;
+                                                func->line = yylineno;
                                                 func->isActive = true;
 
                                                 int res = symTable.insert(func);
-                                                if (res == 2) myerror(&(yylsp[-1]), "Error: Redeclaration of Identifier in the same scope.\n");
-                                                if (res == 3) myerror(&(yylsp[-1]), "Error: Cannot shadow lib function.\n");
 
-                                                delete func;
+                                                if (res == 2) myerror(&(yylsp[-1]), "Error: Name already declared in this scope.");
+                                                if (res == 3) myerror(&(yylsp[-1]), "Error: Cannot shadow lib functions.");
+                                                if (res == 4) myerror(&(yylsp[-1]), "Error: Cannot shadow user-active functions");
+
+
+                                                funcStack.push(func);
+                                                skipBlockScope = true;
                                                 symTable.enter_scope();
-                                                inFunction = true;
+
+
+                                                }
+#line 2416 "out/parser.tab.cpp"
+    break;
+
+  case 73: /* funcdef: FUNCTION IDENTIFIER LEFT_PARENTHESIS $@2 idlist RIGHT_PARENTHESIS block  */
+#line 541 "src/parser.y"
+                                                                                 {
+                                                                                        funcStack.pop();
+                                                                                        skipBlockScope = false;
+                                                                                        fprintf(yyout, "[-] Reduced: funcdef -> FUNCTION IDENTIFIER LEFT_PARENTHESIS idlist RIGHT_PARENTHESIS block\n");
+                                                                                }
+#line 2426 "out/parser.tab.cpp"
+    break;
+
+  case 74: /* $@3: %empty  */
+#line 547 "src/parser.y"
+                                        {
+                                                std::string name = generateAnonymousName();
+                                                SymEntry* func = new SymEntry;
+                                                func->name = name;
+                                                func->type = FUNC;
+                                                func->scope = symTable.getScope();
+                                                func->line = yylineno;
+                                                func->isActive = true;
+
+                                                int res = symTable.insert(func);
+
+                                                if (res == 2) myerror(&(yylsp[0]), "Error: Name already declared in this scope.");
+                                                if (res == 3) myerror(&(yylsp[0]), "Error: Cannot shadow lib functions.");
+                                                if (res == 4) myerror(&(yylsp[0]), "Error: Cannot shadow user-active functions");
+
+
+                                                funcStack.push(func);
+                                                skipBlockScope = true;
+                                                symTable.enter_scope();
+
+
                                         }
-#line 2388 "out/parser.tab.cpp"
+#line 2453 "out/parser.tab.cpp"
     break;
 
   case 75: /* funcdef: FUNCTION LEFT_PARENTHESIS $@3 idlist RIGHT_PARENTHESIS block  */
-#line 493 "src/parser.y"
-                                                               {
-                                                                symTable.exit_scope();
-                                                                inFunction = false;
-                                                                fprintf(yyout, "[-] Reduced: funcdef -> FUNCTION LEFT_PARENTHESIS idlist RIGHT_PARENTHESIS block\n");
-                                                        }
-#line 2398 "out/parser.tab.cpp"
+#line 568 "src/parser.y"
+                                                                                {       
+                                                                                        funcStack.pop();
+                                                                                        skipBlockScope = false;
+                                                                                        fprintf(yyout, "[-] Reduced: funcdef -> FUNCTION LEFT_PARENTHESIS idlist RIGHT_PARENTHESIS block\n");
+                                                                                }
+#line 2463 "out/parser.tab.cpp"
     break;
 
   case 76: /* const: INTEGER  */
-#line 501 "src/parser.y"
+#line 576 "src/parser.y"
                         {
                                 fprintf(yyout, "[-] Reduced: const -> INTEGER\n");
                         }
-#line 2406 "out/parser.tab.cpp"
+#line 2471 "out/parser.tab.cpp"
     break;
 
   case 77: /* const: REAL  */
-#line 505 "src/parser.y"
+#line 580 "src/parser.y"
                         {
                                 fprintf(yyout, "[-] Reduced: const -> REAL\n");
                         }
-#line 2414 "out/parser.tab.cpp"
+#line 2479 "out/parser.tab.cpp"
     break;
 
-  case 78: /* const: STRING  */
-#line 509 "src/parser.y"
+  case 78: /* const: STRINGT  */
+#line 584 "src/parser.y"
                         {
+                                (yyval.str_val) = (yyvsp[0].str_val);
                                 fprintf(yyout, "[-] Reduced: const -> STRING\n");
                         }
-#line 2422 "out/parser.tab.cpp"
+#line 2488 "out/parser.tab.cpp"
     break;
 
   case 79: /* const: TRUE  */
-#line 513 "src/parser.y"
+#line 589 "src/parser.y"
                         {
                                 fprintf(yyout, "[-] Reduced: const -> TRUE\n");
                         }
-#line 2430 "out/parser.tab.cpp"
+#line 2496 "out/parser.tab.cpp"
     break;
 
   case 80: /* const: FALSE  */
-#line 517 "src/parser.y"
+#line 593 "src/parser.y"
                         {
                                 fprintf(yyout, "[-] Reduced: const -> FALSE\n");
                         }
-#line 2438 "out/parser.tab.cpp"
+#line 2504 "out/parser.tab.cpp"
     break;
 
   case 81: /* const: NIL  */
-#line 521 "src/parser.y"
+#line 597 "src/parser.y"
                         {
                                 fprintf(yyout, "[-] Reduced: const -> NIL\n");
                         }
-#line 2446 "out/parser.tab.cpp"
+#line 2512 "out/parser.tab.cpp"
     break;
 
   case 82: /* idlist: IDENTIFIER  */
-#line 526 "src/parser.y"
-                        {       SymEntry* arg = new SymEntry;
-                                arg->name = (yyvsp[0].str_val);
-                                arg->type = FORARG;
-                                arg->scope = symTable.getScope();
-                                arg->line = (yylsp[0]).first_line;
-                                arg->isActive = true;
+#line 602 "src/parser.y"
+                        {       
+                                SymEntry* entry = new SymEntry;
+                                entry->name = (yyvsp[0].str_val);
+                                entry->type = FORARG;
+                                entry->scope = symTable.getScope();
+                                entry->line = yylineno;
+                                entry->isActive = true;
+                                fprintf(yyout, "Inserting id in symtable\n");
+                                int res = symTable.insert(entry);
 
-                                int res = symTable.insert(arg);
-                                if (res == 2) myerror(&(yylsp[0]), "Error: Redeclaration of argument.\n");
-                                if (res == 3) myerror(&(yylsp[0]), "Error: Cannot use lib function as formal argument.\n");
+                                if (res == 2) myerror(&(yylsp[0]), "Error: Variable already declared in this scope.");
+                                if (res == 3) myerror(&(yylsp[0]), "Error: Cannot shadow lib functions.");
+                                if (res == 4) myerror(&(yylsp[0]), "Error: Cannot shadow user-active functions");
 
-                                delete arg;
+                                funcStack.top()->args.push_back(entry);
+                                // print name : forarg of func : name
+                                fprintf(yyout, "[-] Inserting %s as forarg in func %s\n", (yyvsp[0].str_val), funcStack.top()->name.c_str());
+
                                 fprintf(yyout, "[-] Reduced: idlist -> IDENTIFIER\n");
                         }
-#line 2465 "out/parser.tab.cpp"
+#line 2537 "out/parser.tab.cpp"
     break;
 
   case 83: /* idlist: idlist COMMA IDENTIFIER  */
-#line 540 "src/parser.y"
-                                    {
+#line 622 "src/parser.y"
+                                    {   
+                                        SymEntry* entry = new SymEntry;
+                                        entry->name = (yyvsp[0].str_val);
+                                        entry->type = FORARG;
+                                        entry->scope = symTable.getScope();
+                                        entry->line = yylineno;
+                                        entry->isActive = true;
+                                        fprintf(yyout, "Inserting id in symtable\n");
+                                        int res = symTable.insert(entry);
+
+                                        if (res == 2) myerror(&(yylsp[0]), "Error: Variable already declared in this scope.");
+                                        if (res == 3) myerror(&(yylsp[0]), "Error: Cannot shadow lib functions.");
+                                        if (res == 4) myerror(&(yylsp[0]), "Error: Cannot shadow user-active functions");
+
+                                        funcStack.top()->args.push_back(entry);
+                                        
+                                        fprintf(yyout, "[-] Inserting %s as forarg in func %s\n", (yyvsp[0].str_val), funcStack.top()->name.c_str());
+
                                         fprintf(yyout, "[-] Reduced: idlist -> idlist COMMA IDENTIFIER\n");
                                     }
-#line 2473 "out/parser.tab.cpp"
+#line 2562 "out/parser.tab.cpp"
     break;
 
   case 84: /* idlist: %empty  */
-#line 543 "src/parser.y"
+#line 642 "src/parser.y"
                                 {
                                         fprintf(yyout, "[-] Reduced: idlist -> /* empty */\n");
                                 }
-#line 2481 "out/parser.tab.cpp"
+#line 2570 "out/parser.tab.cpp"
     break;
 
   case 85: /* ifstmt: IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt  */
-#line 548 "src/parser.y"
+#line 647 "src/parser.y"
                                                                                 {
                                                                                     fprintf(yyout, "[-] Reduced: ifstmt -> IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt\n");
                                                                                 }
-#line 2489 "out/parser.tab.cpp"
+#line 2578 "out/parser.tab.cpp"
     break;
 
   case 86: /* ifstmt: IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt ELSE stmt  */
-#line 552 "src/parser.y"
+#line 651 "src/parser.y"
                                                                                 {
                                                                                     fprintf(yyout, "[-] Reduced: ifstmt -> IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt ELSE stmt\n");
                                                                                 }
-#line 2497 "out/parser.tab.cpp"
+#line 2586 "out/parser.tab.cpp"
     break;
 
-  case 87: /* $@4: %empty  */
-#line 557 "src/parser.y"
-                        {
-                                rabbitHole++;
-                        }
-#line 2505 "out/parser.tab.cpp"
-    break;
-
-  case 88: /* whilestmt: WHILE $@4 LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt  */
-#line 559 "src/parser.y"
-                                                                         {
-                                                                                rabbitHole--;
+  case 87: /* whilestmt: WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt  */
+#line 656 "src/parser.y"
+                                                                        {
                                                                                 fprintf(yyout, "[-] Reduced: whilestmt -> WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt\n");
                                                                         }
-#line 2514 "out/parser.tab.cpp"
+#line 2594 "out/parser.tab.cpp"
     break;
 
-  case 89: /* $@5: %empty  */
-#line 565 "src/parser.y"
-                {
-                        rabbitHole++;
-                }
-#line 2522 "out/parser.tab.cpp"
-    break;
-
-  case 90: /* forstmt: FOR $@5 LEFT_PARENTHESIS elist SEMICOLON expr SEMICOLON elist RIGHT_PARENTHESIS stmt  */
-#line 567 "src/parser.y"
-                                                                                                {
-                                                                                                        rabbitHole--;
+  case 88: /* forstmt: FOR LEFT_PARENTHESIS elist SEMICOLON expr SEMICOLON elist RIGHT_PARENTHESIS stmt  */
+#line 661 "src/parser.y"
+                                                                                           {
                                                                                                         fprintf(yyout, "[-] Reduced: forstmt -> FOR LEFT_PARENTHESIS elist SEMICOLON expr SEMICOLON elist RIGHT_PARENTHESIS stmt\n");
                                                                                                 }
-#line 2531 "out/parser.tab.cpp"
+#line 2602 "out/parser.tab.cpp"
     break;
 
-  case 91: /* returnstmt: RETURN expr SEMICOLON  */
-#line 573 "src/parser.y"
+  case 89: /* returnstmt: RETURN expr SEMICOLON  */
+#line 666 "src/parser.y"
                                         {
                                             fprintf(yyout, "[-] Reduced: returnstmt -> RETURN expr SEMICOLON\n");
                                         }
-#line 2539 "out/parser.tab.cpp"
+#line 2610 "out/parser.tab.cpp"
     break;
 
-  case 92: /* returnstmt: RETURN SEMICOLON  */
-#line 576 "src/parser.y"
+  case 90: /* returnstmt: RETURN SEMICOLON  */
+#line 669 "src/parser.y"
                                         {
                                                 fprintf(yyout, "[-] Reduced: returnstmt -> RETURN SEMICOLON\n");
                                         }
-#line 2547 "out/parser.tab.cpp"
+#line 2618 "out/parser.tab.cpp"
     break;
 
-  case 93: /* errors: ERROR_COMMENT  */
-#line 581 "src/parser.y"
+  case 91: /* errors: ERROR_COMMENT  */
+#line 674 "src/parser.y"
                         {
                                 fprintf(yyout, "[-] Reduced: errors -> ERROR_COMMENT\n");
                                 myerror(&(yylsp[0]), "Error: Invalid comment");
                                 exit(1);
                         }
-#line 2557 "out/parser.tab.cpp"
+#line 2628 "out/parser.tab.cpp"
     break;
 
-  case 94: /* errors: ERROR_STRING  */
-#line 587 "src/parser.y"
+  case 92: /* errors: ERROR_STRING  */
+#line 680 "src/parser.y"
                         {
                                 fprintf(yyout, "[-] Reduced: errors -> ERROR_STRING\n");
                                 myerror(&(yylsp[0]), "Error: Invalid string");
                                 exit(1);
                         }
-#line 2567 "out/parser.tab.cpp"
+#line 2638 "out/parser.tab.cpp"
     break;
 
-  case 95: /* errors: ERROR_ESCAPE  */
-#line 593 "src/parser.y"
+  case 93: /* errors: ERROR_ESCAPE  */
+#line 686 "src/parser.y"
                         {
                                 fprintf(yyout, "[-] Reduced: errors -> ERROR_ESCAPE\n");
                                 myerror(&(yylsp[0]), "Error: Invalid escape sequence");
                                 exit(1);
                         }
-#line 2577 "out/parser.tab.cpp"
+#line 2648 "out/parser.tab.cpp"
     break;
 
-  case 96: /* errors: UNDEF  */
-#line 599 "src/parser.y"
+  case 94: /* errors: UNDEF  */
+#line 692 "src/parser.y"
                         {
                                 fprintf(yyout, "[-] Reduced: errors -> UNDEF\n");
                                 myerror(&(yylsp[0]), "Error: Undefined token");     
                                 exit(1);
                         }
-#line 2587 "out/parser.tab.cpp"
+#line 2658 "out/parser.tab.cpp"
     break;
 
 
-#line 2591 "out/parser.tab.cpp"
+#line 2662 "out/parser.tab.cpp"
 
       default: break;
     }
@@ -2816,7 +2887,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 605 "src/parser.y"
+#line 698 "src/parser.y"
 
 
 

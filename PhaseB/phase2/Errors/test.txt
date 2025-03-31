@@ -1,0 +1,31 @@
+den doulevoun 
+errors
+
+0
+3
+7
+9
+
+working
+block
+grammar
+random
+simple
+tree
+
+21 total
+not working 9
+working 12
+
+
+inserts
+
+funcdef 2 tick 
+
+idlist 2 tick
+
+primary lvalue 1 
+
+lvalue ident 2
+
+lvalue local ident 2

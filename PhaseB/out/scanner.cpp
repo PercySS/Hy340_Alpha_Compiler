@@ -390,11 +390,11 @@ static const flex_int16_t yy_accept[119] =
         2,    3,    2,    5,    3,    2,    2,    2,    4,    4,
         4,    4,    4,    4,    4,    4,    4,    4,    4,    4,
         4,   24,   23,   23,   24,   24,   28,   27,   27,   28,
-       28,   19,   20,   19,   17,    9,    9,    8,   17,   30,
+       28,   19,   20,   19,   16,   14,   14,   15,   16,   30,
         2,    3,   21,   18,    0,    5,    4,    4,    4,    4,
         4,    4,    4,    4,    1,    4,    4,    4,    4,    4,
-        4,   22,   25,   26,   29,   19,   16,   13,   14,   15,
-       10,   12,   11,    6,    4,    4,    4,    4,    4,    4,
+        4,   22,   25,   26,   29,   19,   17,   11,   12,   13,
+        8,   10,    9,    6,    4,    4,    4,    4,    4,    4,
 
         4,    4,    4,    4,    4,    4,    4,    4,    4,    4,
         4,    4,    4,    4,    4,    4,    4,    0
@@ -536,7 +536,7 @@ static const flex_int16_t yy_chk[219] =
 /* Table of booleans, true if rule could match eol. */
 static const flex_int32_t yy_rule_can_match_eol[34] =
     {   0,
-0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 
     1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0,     };
 
 static yy_state_type yy_last_accepting_state;
@@ -1091,86 +1091,89 @@ YY_RULE_SETUP
                                     BEGIN(STRING);
                                 }
 	YY_BREAK
+/* escaped cahracters */
 case 8:
 YY_RULE_SETUP
-#line 250 "src/scanner.l"
+#line 251 "src/scanner.l"
 {   
-                                    fprintf(yyout, "[+] Shift token string.\n");
-                                    yylval.str_val = strdup(string_buffer);
-                                    reset_string_buffer();
-
-                                    BEGIN(INITIAL);
-                                    return STRING;
+                                    fprintf(yyout, "[*] Escape sequence: \\n\n");
+                                    append_to_string_buffer("\n");
                                 }
 	YY_BREAK
 case 9:
-/* rule 9 can match eol */
 YY_RULE_SETUP
-#line 259 "src/scanner.l"
-{
-                                    append_to_string_buffer("\n");
-                                }
-	YY_BREAK
-/* escaped cahracters */
-case 10:
-YY_RULE_SETUP
-#line 263 "src/scanner.l"
-{ 
-                                    append_to_string_buffer("\n");
-                                }
-	YY_BREAK
-case 11:
-YY_RULE_SETUP
-#line 268 "src/scanner.l"
+#line 257 "src/scanner.l"
 { 
                                     append_to_string_buffer("\t");
                                 }
 	YY_BREAK
-case 12:
+case 10:
 YY_RULE_SETUP
-#line 272 "src/scanner.l"
+#line 261 "src/scanner.l"
 { 
                                     append_to_string_buffer("\r");
                                 }   
 	YY_BREAK
-case 13:
+case 11:
 YY_RULE_SETUP
-#line 276 "src/scanner.l"
+#line 265 "src/scanner.l"
 { 
                                     append_to_string_buffer("\"");
                                 }
 	YY_BREAK
-case 14:
+case 12:
 YY_RULE_SETUP
-#line 280 "src/scanner.l"
+#line 269 "src/scanner.l"
 { 
                                     append_to_string_buffer("\'");
                                 }
 	YY_BREAK
-case 15:
+case 13:
 YY_RULE_SETUP
-#line 284 "src/scanner.l"
+#line 273 "src/scanner.l"
 { 
                                     append_to_string_buffer("\\");
                                 }
 	YY_BREAK
-/* Invalid Escapes */
+case 14:
+/* rule 14 can match eol */
+YY_RULE_SETUP
+#line 277 "src/scanner.l"
+{
+                                    append_to_string_buffer("\n");
+                                }
+	YY_BREAK
+case 15:
+YY_RULE_SETUP
+#line 281 "src/scanner.l"
+{   
+                                    string_buffer[string_len] = '\0'; // null-terminate the string
+                                    yylval.str_val = strdup(string_buffer);
+
+                                    fprintf(yyout, "[+] Shift token string: %s\n", yylval.str_val);
+
+                                    BEGIN(INITIAL);
+                                    return STRINGT;
+                                }
+	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 289 "src/scanner.l"
+#line 292 "src/scanner.l"
+{   
+                                    fprintf(yyout, "[*] Caught char in string: %s\n", yytext);
+                                    append_to_string_buffer(yytext);
+                                }
+	YY_BREAK
+/* Invalid Escapes */
+case 17:
+YY_RULE_SETUP
+#line 298 "src/scanner.l"
 {
                                     return ERROR_ESCAPE;
                                 }
 	YY_BREAK
-case 17:
-YY_RULE_SETUP
-#line 295 "src/scanner.l"
-{ 
-                                    append_to_string_buffer(yytext);
-                                }
-	YY_BREAK
 case YY_STATE_EOF(STRING):
-#line 299 "src/scanner.l"
+#line 305 "src/scanner.l"
 {
                                     return ERROR_STRING;
                                 }
@@ -1178,20 +1181,20 @@ case YY_STATE_EOF(STRING):
 /* Single Line Comments */
 case 18:
 YY_RULE_SETUP
-#line 304 "src/scanner.l"
+#line 311 "src/scanner.l"
 { 
                                     BEGIN(SLCOMMENT);
                                 }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 308 "src/scanner.l"
+#line 315 "src/scanner.l"
 { }
 	YY_BREAK
 case 20:
 /* rule 20 can match eol */
 YY_RULE_SETUP
-#line 310 "src/scanner.l"
+#line 317 "src/scanner.l"
 {    
                                         fprintf(yyout, "[+] Shift token single-line comment (ignored).\n");
                                         BEGIN(INITIAL);
@@ -1200,7 +1203,7 @@ YY_RULE_SETUP
 /* Multi Line Comments */
 case 21:
 YY_RULE_SETUP
-#line 317 "src/scanner.l"
+#line 324 "src/scanner.l"
 {   
                                     tokenStack.push(yylineno);
                                     BEGIN(COMMENT);
@@ -1208,7 +1211,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 322 "src/scanner.l"
+#line 329 "src/scanner.l"
 {   
                                     fprintf(yyout, "[+] Shift token multi-line comment (ignored).\n");
                                     tokenStack.pop();
@@ -1218,23 +1221,23 @@ YY_RULE_SETUP
 case 23:
 /* rule 23 can match eol */
 YY_RULE_SETUP
-#line 328 "src/scanner.l"
+#line 335 "src/scanner.l"
 { }
 	YY_BREAK
 case YY_STATE_EOF(COMMENT):
-#line 330 "src/scanner.l"
+#line 337 "src/scanner.l"
 {
                                     return ERROR_COMMENT;
                                 }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 334 "src/scanner.l"
+#line 341 "src/scanner.l"
 { }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 336 "src/scanner.l"
+#line 343 "src/scanner.l"
 { 
                                     tokenStack.push(yylineno);
                                     BEGIN(NESTED);
@@ -1242,7 +1245,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 341 "src/scanner.l"
+#line 348 "src/scanner.l"
 {   
                                     fprintf(yyout, "[+] Shift token nested comment (ignored).\n");
                                     tokenStack.pop();
@@ -1257,23 +1260,23 @@ YY_RULE_SETUP
 case 27:
 /* rule 27 can match eol */
 YY_RULE_SETUP
-#line 352 "src/scanner.l"
+#line 359 "src/scanner.l"
 { }
 	YY_BREAK
 case YY_STATE_EOF(NESTED):
-#line 354 "src/scanner.l"
+#line 361 "src/scanner.l"
 {
                                     return ERROR_COMMENT;
                                 }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 358 "src/scanner.l"
+#line 365 "src/scanner.l"
 { }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 360 "src/scanner.l"
+#line 367 "src/scanner.l"
 {
                                     tokenStack.push(yylineno);
                                     BEGIN(NESTED);
@@ -1282,20 +1285,20 @@ YY_RULE_SETUP
 /* WhiteSpaces */
 case 30:
 YY_RULE_SETUP
-#line 368 "src/scanner.l"
+#line 375 "src/scanner.l"
 { } 
 	YY_BREAK
 /* New Line  for all environments */
 case 31:
 /* rule 31 can match eol */
 YY_RULE_SETUP
-#line 371 "src/scanner.l"
+#line 378 "src/scanner.l"
 { }
 	YY_BREAK
 /* EOF */
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(SLCOMMENT):
-#line 375 "src/scanner.l"
+#line 382 "src/scanner.l"
 {   
             fprintf(yyout, "[+] Shift token EOF.\n");
             return EOF; 
@@ -1303,7 +1306,7 @@ case YY_STATE_EOF(SLCOMMENT):
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 380 "src/scanner.l"
+#line 387 "src/scanner.l"
 {   
             fprintf(yyout, "[-] Error: Unrecognized token: %s\n", yytext);
             return UNDEF;
@@ -1311,10 +1314,10 @@ YY_RULE_SETUP
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 384 "src/scanner.l"
+#line 391 "src/scanner.l"
 ECHO;
 	YY_BREAK
-#line 1318 "out/scanner.cpp"
+#line 1321 "out/scanner.cpp"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -2288,5 +2291,5 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 384 "src/scanner.l"
+#line 391 "src/scanner.l"
 

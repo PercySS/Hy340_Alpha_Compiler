@@ -2,32 +2,19 @@
 
 SymbolTable::SymbolTable() {
     scope = 0;
-    scopes.push_back(std::unordered_map<string, SymEntry>());
-    // insert the library functions
-    SymEntry* print = new SymEntry{"print", LIBFUNC, 0, 0, true};
-    insert(print);
-    SymEntry* input = new SymEntry{"input", LIBFUNC, 0, 0, true};
-    insert(input);
-    SymEntry* objectmemberkeys = new SymEntry{"objectmemberkeys", LIBFUNC, 0, 0, true};
-    insert(objectmemberkeys);
-    SymEntry* objecttotalmembers = new SymEntry{"objecttotalmembers", LIBFUNC, 0, 0, true};
-    insert(objecttotalmembers);
-    SymEntry* objectcopy = new SymEntry{"objectcopy", LIBFUNC, 0, 0, true};
-    insert(objectcopy);
-    SymEntry* totalarguments = new SymEntry{"totalarguments", LIBFUNC, 0, 0, true};
-    insert(totalarguments);
-    SymEntry* argument = new SymEntry{"argument", LIBFUNC, 0, 0, true};
-    insert(argument);
-    SymEntry* typeof = new SymEntry{"typeof", LIBFUNC, 0, 0, true};
-    insert(typeof);
-    SymEntry* strtonum = new SymEntry{"strtonum", LIBFUNC, 0, 0, true};
-    insert(strtonum);
-    SymEntry* sqrt = new SymEntry{"sqrt", LIBFUNC, 0, 0, true};
-    insert(sqrt);
-    SymEntry* cos = new SymEntry{"cos", LIBFUNC, 0, 0, true};
-    insert(cos);
-    SymEntry* sin = new SymEntry{"sin", LIBFUNC, 0, 0, true};
-    insert(sin);
+    scopes.push_back(std::vector<std::pair<std::string, SymEntry>>());
+
+    libfuncs = {
+        "print", "input", "objectmemberkeys", "objecttotalmembers",
+        "objectcopy", "totalarguments", "argument", "typeof",
+        "strtonum", "sqrt", "cos", "sin"
+    };
+
+    for (const std::string& name : libfuncs) {
+        SymEntry* entry = new SymEntry{name, LIBFUNC, 0, 0, true};
+        insert(entry);
+        delete entry;
+    }
 }
 
 SymbolTable::~SymbolTable() {
@@ -36,60 +23,87 @@ SymbolTable::~SymbolTable() {
 
 
 int SymbolTable::getScope() const {
-    return scope;
+    return this->scope;
 }
 
 int SymbolTable::insert(SymEntry* entry) {
-    // then i check if the entry already exists in this scope
-    if (scopes[entry->scope].find(entry->name) != scopes[entry->scope].end()) {
-        return 2;
-    }
+    SymEntry* found = new SymEntry;
+    assert(entry);
 
-    // if everything is ok i insert the entry
-    scopes[entry->scope][entry->name] = *entry;
+    assert(entry->scope >= 0 && entry->scope < (int)scopes.size());
+
+
+    scopes[entry->scope].emplace_back(entry->name, *entry);
     return 0;
 }
 
-SymEntry* SymbolTable::lookup(const string& name) {
-    for (int i = scope; i >= 0; i--) {
-        auto it = scopes[i].find(name);
-        if (it != scopes[i].end()) return &it->second;
-    }
+
+
+SymEntry* SymbolTable::lookup(const std::string& name, int scope) const {
+    assert(!name.empty());
+    assert(scope >= 0 && scope < (int)scopes.size());   
+
+    
+
+    // if not found return null
     return nullptr;
 }
 
-
 void SymbolTable::hide(int scope) {
-    // check bounds 
-    if (scope < 0 || scope > this->scope) {
-        return;
-    }
+    if (scope < 0 || scope >= (int)scopes.size()) return;
 
-    for (auto it = scopes[scope].begin(); it != scopes[scope].end(); it++) {
-        it->second.isActive = false;
+    for (auto& pair : scopes[scope]) {
+        pair.second.isActive = false;
     }
 }
 
 void SymbolTable::enter_scope() {
-    // checks if scope is the last one and if so it creates a new one else it just increments the scope
     scope++;
-    if ((size_t)scope == scopes.size() - 1) {
-        scopes.push_back(std::unordered_map<string, SymEntry>());
+    if ((size_t)scope >= scopes.size()) {
+        scopes.push_back(std::vector<std::pair<std::string, SymEntry>>());
     }
 }
 
 void SymbolTable::exit_scope() {
-    hide(scope);
-    if (scope > 0) scope--; 
+    if (scope < 0) return;
+
+    for (size_t i = 0; i < scopes[scope].size(); ++i) {
+        scopes[scope][i].second.isActive = false;
+    }
+
+    scope--;
 }
 
 void SymbolTable::printTable(FILE* output) const {
-    for (int i = 0; i <= scope; i++) {
+    printf("\n======Printing symbol table======");
+    for (int i = 0; (size_t)i < scopes.size(); i++) {
+        fprintf(output, "\n");
+        for (int j = 0; j < i; j++) fprintf(output, "      ");
         fprintf(output, "Scope %d:\n", i);
         for (const auto& it : scopes[i]) {
+            fprintf(output, "      ");
+            for (int j = 0; j < i; j++) fprintf(output, "      ");
             const SymEntry& e = it.second;
-            fprintf(output, "  %s [scope: %d, line: %d, active: %d, type: %d]\n",
-                    e.name.c_str(), e.scope, e.line, e.isActive, e.type);
+            fprintf(output, "%s [scope: %d, line: %d, active: %d, type: %s]\n",
+                    e.name.c_str(), e.scope, e.line, e.isActive, typeToString(e.type).c_str());
         }
     }
+    printf("======END OF SYMTABLE======\n\n");
+}
+
+std::string typeToString(SymbolType type) {
+    switch (type) {
+        case VAR: return "VAR";
+        case FUNC: return "FUNC";
+        case LIBFUNC: return "LIBFUNC";
+        case FORARG: return "FORARG";
+        default: return "UNKNOWN";
+    }
+}
+
+std::string generateAnonymousName() {
+    static int counter = 0;
+    std::stringstream ss;
+    ss << "ANON_" << counter++;
+    return ss.str();
 }
