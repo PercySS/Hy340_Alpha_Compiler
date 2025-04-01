@@ -242,8 +242,7 @@ MACLN       [\r]
                                 }
 
     /* escaped cahracters */
-<STRING>"\\n"                   {   
-                                    fprintf(yyout, "[*] Escape sequence: \\n\n");
+<STRING>"\\n"                   { 
                                     append_to_string_buffer("\n");
                                 }
 
@@ -283,8 +282,7 @@ MACLN       [\r]
                                 }
 
 
-<STRING>.                       {   
-                                    fprintf(yyout, "[*] Caught char in string: %s\n", yytext);
+<STRING>.                       {
                                     append_to_string_buffer(yytext);
                                 }
 

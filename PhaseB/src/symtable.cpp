@@ -3,6 +3,7 @@
 SymbolTable::SymbolTable() {
     scope = 0;
     scopes.push_back(std::vector<std::pair<std::string, SymEntry>>());
+    funcStack.push(nullptr);
 
     libfuncs = {
         "print", "input", "objectmemberkeys", "objecttotalmembers",

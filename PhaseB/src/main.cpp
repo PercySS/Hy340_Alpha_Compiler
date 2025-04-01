@@ -5,6 +5,7 @@
 
 extern FILE* yyin;
 extern FILE* yyout;
+extern int yyparse();
 
 // Global variables for correct handling of the symbol table
 SymbolTable symTable;

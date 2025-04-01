@@ -32,19 +32,21 @@ LDFLAGS  = -lfl
 all: $(TARGET)
 
 # Final linking
-$(TARGET):  $(SCANNER_CPP) $(SYMTABLE) $(MAIN)
+$(TARGET): $(PARSER_CPP) $(SCANNER_CPP) $(SYMTABLE) $(MAIN)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Bison: .y -> .cpp + .hpp
 $(PARSER_CPP) $(PARSER_HPP): $(PARSER)
+	@mkdir -p $(OUT_DIR)
 	$(BISON) -d --defines=$(PARSER_HPP) -o $(PARSER_CPP) $(PARSER)
 
 # Flex: .l -> .cpp + .hpp
 $(SCANNER_CPP) $(SCANNER_HPP): $(SCANNER)
+	@mkdir -p $(OUT_DIR)
 	$(FLEX) -o $(SCANNER_CPP) --header-file=$(SCANNER_HPP) $(SCANNER)
 
-# Clean
+# Clean everything
 clean:
-	rm -f $(OUT_DIR)/*.cpp $(OUT_DIR)/*.hpp $(TARGET)
+	rm -rf $(OUT_DIR) $(TARGET)
 
 .PHONY: all clean

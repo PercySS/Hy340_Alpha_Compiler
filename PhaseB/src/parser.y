@@ -190,7 +190,6 @@ stmt_list:  stmt stmt_list     {
                                 }
 
             | /* empty */       {       
-                                        fprintf(yyout, "%s\n", yylval.str_val);
                                         fprintf(yyout, "[-] Reduced: stmt_list -> /* empty */\n");
                                 }
             ;
@@ -334,7 +333,7 @@ lvalue: IDENTIFIER              {
                                         SymEntry* found;
                                         // Check for libfunc shadowing
                                         if ((found = symTable.lookup($1, 0))) {
-                                                if (found->type == LIBFUNC) fprintf(yyout, "      [!] Error: Variable is shadowing library function in line %d.", yylineno);
+                                                if (found->type == LIBFUNC) $$ = found;
                                         }
 
                                         found = symTable.lookup($1);
@@ -350,8 +349,6 @@ lvalue: IDENTIFIER              {
                                                 symTable.insert(entry);
                                                 $$ = entry;
                                         } else {
-                                                if (found->type == FUNC) $$ = found;
-                                                
                                                 if (found->type == VAR) {
                                                         if (symTable.funcStack.empty()) {
                                                                 $$ = found;
@@ -362,6 +359,8 @@ lvalue: IDENTIFIER              {
                                                                      fprintf(yyout, "      [!] Error: Variable %s is not accessible in line %d.", $1, yylineno); 
                                                                 }
                                                         }
+                                                } else {
+                                                        $$ = found;
                                                 }
                                         }
 
@@ -372,22 +371,23 @@ lvalue: IDENTIFIER              {
                                         SymEntry* found;
                                         if ((found = symTable.lookup($2, 0))) {
                                                 if (found->type == LIBFUNC) fprintf(yyout, "      [!] Error: Local variable is shadowing library function in line %d.", yylineno);
-                                        } else {
-                                              found = symTable.lookup($2, symTable.getScope());
-                                                if (found) {
-                                                        $$ = found;
-                                                } else {
-                                                        SymEntry* entry = new SymEntry;
-                                                        entry->name = $2;
-                                                        entry->type = VAR;
-                                                        entry->scope = symTable.getScope();
-                                                        entry->line = yylineno;
-                                                        entry->isActive = true;
+                                        } 
+                                        
+                                        found = symTable.lookup($2, symTable.getScope());
 
-                                                        symTable.insert(entry);
-                                                        $$ = entry;
-                                                }
-                                        }
+                                        if (found) {
+                                                $$ = found;
+                                        } else {
+                                                SymEntry* entry = new SymEntry;
+                                                entry->name = $2;
+                                                entry->type = VAR;
+                                                entry->scope = symTable.getScope();
+                                                entry->line = yylineno;
+                                                entry->isActive = true;
+
+                                                symTable.insert(entry);
+                                                $$ = entry;
+                                        } 
                                         fprintf(yyout, "[-] Reduced: lvalue -> LOCAL IDENTIFIER\n");
                                 }
 
@@ -500,13 +500,16 @@ block: LEFT_BRACE       {
         ;
 
 funcdef: FUNCTION IDENTIFIER LEFT_PARENTHESIS {
-                                                SymEntry* found = symTable.lookup($2);
+                                                skipBlockScope = true;
+                                                SymEntry* found = symTable.lookup($2, 0);
 
                                                 if (found) {
                                                         if (found->type == LIBFUNC) fprintf(yyout, "      [!] Error : Function shadowing library function in line %d.", yylineno);
-                                                        if (found->type == FUNC && found->scope == symTable.getScope()) fprintf(yyout, "      [!] Error : Function already declared in this scope in line %d.", yylineno);
-                                                        if ((found->type == VAR && found->scope == symTable.getScope()) || (found->type == FORARG && found->scope == symTable.getScope())) fprintf(yyout, "      [!] Error : Function shadowing variable in line %d.", yylineno);
-                                                } else {
+                                                }
+                                                
+                                                found = symTable.lookup($2, symTable.getScope());
+
+                                                if (!found) {
                                                         SymEntry* entry = new SymEntry;
                                                         entry->name = $2;
                                                         entry->type = FUNC;
@@ -514,16 +517,26 @@ funcdef: FUNCTION IDENTIFIER LEFT_PARENTHESIS {
                                                         entry->line = yylineno;
                                                         entry->isActive = true;
 
-                                                        entry->args.clear();
                                                         symTable.funcStack.push(entry);
+                                                        entry->args.clear();
                                                         symTable.insert(entry);
+                                                        fprintf(yyout, "\n                       %s\n", symTable.funcStack.top()->name.c_str());
+                                                } else {
+                                                        if (found->type == FUNC) {
+                                                                fprintf(yyout, "      [!] Error: Function %s already declared in line %d.", $2, yylineno);
+                                                        } else if (found->type == VAR) {
+                                                                fprintf(yyout, "      [!] Error: Function %s is shadowing variable in line %d.", $2, yylineno);
+                                                        } else if (found->type == FORARG) {
+                                                                fprintf(yyout, "      [!] Error: Function %s is shadowing formal argument in line %d.", $2, yylineno);
+                                                        } 
                                                 }
-
                                                 symTable.enter_scope();
-                                                skipBlockScope = true;
-                                                } idlist RIGHT_PARENTHESIS block {
+
+                                                } idlist RIGHT_PARENTHESIS block {      
                                                                                         symTable.funcStack.pop();
-                                                                                        skipBlockScope = false;
+                                                                                        if (symTable.funcStack.empty()) {
+                                                                                                skipBlockScope = false;
+                                                                                        }
                                                                                         fprintf(yyout, "[-] Reduced: funcdef -> FUNCTION IDENTIFIER LEFT_PARENTHESIS idlist RIGHT_PARENTHESIS block\n");
                                                                                 }
                                                 
@@ -582,7 +595,9 @@ idlist: IDENTIFIER      {
                                 if ((found = symTable.lookup($1, 0))) {
                                         if (found->type == LIBFUNC) fprintf(yyout, "      [!] Error: Formal argument is shadowing library function in line %d.", yylineno);
 
-                                } else if ((found = symTable.lookup($1, symTable.getScope()))) {
+                                }
+                                
+                                if ((found = symTable.lookup($1, symTable.getScope()))) {
                                         if (found->type == FORARG) fprintf(yyout, "      [!] Error: Formal argument already declared in line %d.", yylineno);
                                 } else {
                                         SymEntry* entry = new SymEntry;
@@ -604,7 +619,9 @@ idlist: IDENTIFIER      {
                                         if ((found = symTable.lookup($3, 0))) {
                                                 if (found->type == LIBFUNC) fprintf(yyout, "      [!] Error: Formal argument is shadowing library function in line %d.", yylineno);
 
-                                        } else if ((found = symTable.lookup($3, symTable.getScope()))) {
+                                        } 
+                                        
+                                        if ((found = symTable.lookup($3, symTable.getScope()))) {
                                                 if (found->type == FORARG) fprintf(yyout, "      [!] Error: Formal argument already declared in line %d.", yylineno);
                                         } else {
                                                 SymEntry* entry = new SymEntry;
