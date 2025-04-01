@@ -21,7 +21,6 @@ typedef enum {
     FORARG
 } SymbolType;
 
-
 typedef struct SymEntry {
     std::string name;
     SymbolType type;
@@ -42,7 +41,7 @@ public:
     int getScope() const;
 
     // insertion
-    int insert(SymEntry* entry);
+    void insert(SymEntry* entry);
     
     // lookupz
     SymEntry* lookup(const std::string& name, int scope = -1) const;

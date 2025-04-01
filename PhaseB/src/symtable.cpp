@@ -11,7 +11,13 @@ SymbolTable::SymbolTable() {
     };
 
     for (const std::string& name : libfuncs) {
-        SymEntry* entry = new SymEntry{name, LIBFUNC, 0, 0, true};
+        SymEntry* entry = new SymEntry;
+        entry->name = name;
+        entry->scope = 0;
+        entry->line = 0;
+        entry->isActive = true;
+        entry->type = LIBFUNC;
+        entry->args.clear();
         insert(entry);
         delete entry;
     }
@@ -26,24 +32,37 @@ int SymbolTable::getScope() const {
     return this->scope;
 }
 
-int SymbolTable::insert(SymEntry* entry) {
-    SymEntry* found = new SymEntry;
+void SymbolTable::insert(SymEntry* entry) {
     assert(entry);
 
     assert(entry->scope >= 0 && entry->scope < (int)scopes.size());
 
-
     scopes[entry->scope].emplace_back(entry->name, *entry);
-    return 0;
 }
 
 
 
 SymEntry* SymbolTable::lookup(const std::string& name, int scope) const {
     assert(!name.empty());
-    assert(scope >= 0 && scope < (int)scopes.size());   
+    assert(scope >= -1 && scope < (int)scopes.size());   
 
-    
+    // if scope is -1, search in all scopes
+    if (scope == -1) {
+        for (int i = scopes.size() - 1; i >= 0; --i) {
+            for (const auto& pair : scopes[i]) {
+                if (pair.first == name && pair.second.isActive) {
+                    return new SymEntry(pair.second); // return a copy of the entry
+                }
+            }
+        }
+    } else {
+        // search in the specified scope
+        for (const auto& pair : scopes[scope]) {
+            if (pair.first == name && pair.second.isActive) {
+                return new SymEntry(pair.second); // return a copy of the entry
+            }
+        }
+    }
 
     // if not found return null
     return nullptr;
@@ -104,6 +123,6 @@ std::string typeToString(SymbolType type) {
 std::string generateAnonymousName() {
     static int counter = 0;
     std::stringstream ss;
-    ss << "ANON_" << counter++;
+    ss << "_ANON_" << counter++;
     return ss.str();
 }

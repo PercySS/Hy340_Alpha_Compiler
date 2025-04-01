@@ -1,5 +1,5 @@
-%define         parse.error     verbose
-%define         parse.trace    
+/* %define         parse.error     verbose
+%define         parse.trace  */   
 %locations
 
 %{
@@ -7,7 +7,8 @@
 #include <string>
 #include <cstdarg>
 #include <cstdio>
-#include "parser.tab.hpp"
+#include <vector>
+
 #include "../src/symtable.hpp"
 
 extern SymbolTable symTable;
@@ -17,19 +18,20 @@ extern int yylex();
 extern int yylineno;
 extern FILE *yyin;
 extern FILE *yyout;
-void myerror(YYLTYPE* loc, const char* msg);
 void yyerror(const char* msg);
 
 %}
+
+
+%start program
 
 %union {
     int int_val;
     float float_val;
     char* str_val;
+    struct SymEntry* node;
 }
 
-
-%start program
 
 /* OPS */
 %token PLUS
@@ -95,7 +97,9 @@ void yyerror(const char* msg);
 %token ERROR_ESCAPE
 %token UNDEF
 
-%type <str_val> assignexpr lvalue primary const
+
+%type <node> lvalue
+%type <str_val> assignexpr primary const
 %type <str_val> call callsuffix normcall methodcall
 %type <str_val> elist objectdef indexed indexedelem
 %type <str_val> idlist
@@ -115,8 +119,8 @@ void yyerror(const char* msg);
 
 %nonassoc GREATER_THAN GREATER_THAN_EQUAL LESS_THAN LESS_THAN_EQUAL
 %nonassoc LOWER_THAN_ELSE
-%nonassoc ELSE
 %nonassoc EQUAL NOT_EQUAL
+%nonassoc ELSE
 
 %left AND 
 %left OR
@@ -151,17 +155,17 @@ stmt: expr SEMICOLON    {
                         }
 
         | returnstmt    {       
-                                if (funcStack.empty()) myerror(&@1, "Error: Return statement outside of function");
+                                if (symTable.funcStack.empty()) fprintf(yyout, "      [!] Error: Return statement outside of function in line %d.", yylineno);
                                 fprintf(yyout, "[-] Reduced: stmt -> returnstmt\n");
                         }
 
         | BREAK SEMICOLON       {       
-                                        if (rabbitHole < 1)  myerror(&@1, "Error: Break statement outside of loop");
+                                        if (rabbitHole < 1)  fprintf(yyout, "      [!] Error: Break statement outside of loop in line %d.", yylineno);
                                         fprintf(yyout, "[-] Reduced: stmt -> BREAK SEMICOLON\n");
                                 }
 
         | CONTINUE SEMICOLON    {       
-                                        if (rabbitHole < 1) myerror(&@1, "Error: Continue statement outside of loop");
+                                        if (rabbitHole < 1) fprintf(yyout, "      [!] Error: Continue statement outside of loop in line %d.", yylineno);
                                         fprintf(yyout, "[-] Reduced: stmt -> CONTINUE SEMICOLON\n");
                                 }
         | block                 {       
@@ -256,35 +260,31 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
                                                         fprintf(yyout, "[-] Reduced: term -> LEFT_PARENTHESIS expr RIGHT_PARENTHESIS\n");
                                                 }
 
-        | MINUS expr %prec UMINUS               {       
+        | MINUS expr %prec UMINUS               { 
                                                         fprintf(yyout, "[-] Reduced: term -> MINUS expr\n");
                                                 }
 
-        | NOT expr                              {
+        | NOT expr                              { 
                                                         fprintf(yyout, "[-] Reduced: term -> NOT expr\n");
                                                 }
 
         | INCREMENT lvalue                      {       
-                                                        SymEntry* found = symTable.lookup($2);
-                                                        if (found && found->type == FUNC) myerror(&@1, "Error: Function is not l-value");
+                                                        if ($2->type == FUNC) fprintf(yyout, "      [!] Error: Cannot use function as lvalue (++func) in line %d.", yylineno);
                                                         fprintf(yyout, "[-] Reduced: term -> INCREMENT lvalue\n");
                                                 }
 
         | lvalue INCREMENT                      {       
-                                                        SymEntry* found = symTable.lookup($1);
-                                                        if (found && found->type == FUNC) myerror(&@1, "Error: Function call is not l-value");
+                                                        if ($1->type == FUNC) fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func++) in line %d.", yylineno);
                                                         fprintf(yyout, "[-] Reduced: term -> lvalue INCREMENT\n");
                                                 }
 
         | DECREMENT lvalue                      {       
-                                                        SymEntry* found = symTable.lookup($2);
-                                                        if (found && found->type == FUNC) myerror(&@1, "Error: Function call is not l-value");
+                                                        if ($2->type == FUNC) fprintf(yyout, "      [!] Error: Cannot use function as lvalue (--func) in line %d.", yylineno);
                                                         fprintf(yyout, "[-] Reduced: term -> DECREMENT lvalue\n");
                                                 }
 
         | lvalue DECREMENT                      {       
-                                                        SymEntry* found = symTable.lookup($1);
-                                                        if (found && found->type == FUNC) myerror(&@1, "Error: Function call is not l-value");
+                                                        if ($1->type == FUNC) fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func--) in line %d.", yylineno);
                                                         fprintf(yyout, "[-] Reduced: term -> lvalue DECREMENT\n");
                                                 }        
         
@@ -293,16 +293,19 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
                                                 }
         ;
 
-assignexpr:     lvalue ASSIGN expr              {
+assignexpr:     lvalue ASSIGN expr              {       
+                                                        if ($1->type == FUNC) fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func = expr) in line %d.", yylineno);
+                                                        if ($1->type == LIBFUNC) fprintf(yyout, "      [!] Error: Cannot assign to library function in line %d.", yylineno);
                                                         fprintf(yyout, "[-] Reduced: assignexpr -> lvalue ASSIGN expr\n");
                                                 }
 
-                | lvalue PLUS_ASSIGN expr       {
+                | lvalue PLUS_ASSIGN expr       {       
+                                                        if ($1->type == FUNC) fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func += expr) in line %d.", yylineno);
                                                         fprintf(yyout, "[-] Reduced: assignexpr -> lvalue PLUS_ASSIGN expr\n");
                                                 }
 
                 | lvalue MINUS_ASSIGN expr      {
-                                                        fprintf(yyout, "[-] Reduced: assignexpr -> lvalue ASSIGN expr\n");
+                                                        if ($1->type == FUNC) fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func -= expr) in line %d.", yylineno);
                                                         fprintf(yyout, "[-] Reduced: assignexpr -> lvalue MINUS_ASSIGN expr\n");
                                                 }
                 ;
@@ -328,33 +331,73 @@ primary: lvalue                 {
         ;
 
 lvalue: IDENTIFIER              {       
-                                        SymEntry* found = symTable.lookup($1);
+                                        SymEntry* found;
+                                        // Check for libfunc shadowing
+                                        if ((found = symTable.lookup($1, 0))) {
+                                                if (found->type == LIBFUNC) fprintf(yyout, "      [!] Error: Variable is shadowing library function in line %d.", yylineno);
+                                        }
 
-                                        if (found && found->type == FUNC) myerror(&@1, "Error: Function is not l-value");
+                                        found = symTable.lookup($1);
+
+                                        if (!found) {
+                                                SymEntry* entry = new SymEntry;
+                                                entry->name = $1;
+                                                entry->type = VAR;
+                                                entry->scope = symTable.getScope();
+                                                entry->line = yylineno;
+                                                entry->isActive = true;
+
+                                                symTable.insert(entry);
+                                                $$ = entry;
+                                        } else {
+                                                if (found->type == FUNC) $$ = found;
+                                                
+                                                if (found->type == VAR) {
+                                                        if (symTable.funcStack.empty()) {
+                                                                $$ = found;
+                                                        } else {
+                                                                if (found->scope == symTable.getScope() || found->scope == 0) {
+                                                                        $$ = found;
+                                                                } else {
+                                                                     fprintf(yyout, "      [!] Error: Variable %s is not accessible in line %d.", $1, yylineno); 
+                                                                }
+                                                        }
+                                                }
+                                        }
 
                                         fprintf(yyout, "[-] Reduced: lvalue -> IDENTIFIER\n");
                                 }
+
         | LOCAL IDENTIFIER      {       
-                                        SymEntry* found = symTable.lookupInCurrentScope($2);
+                                        SymEntry* found;
+                                        if ((found = symTable.lookup($2, 0))) {
+                                                if (found->type == LIBFUNC) fprintf(yyout, "      [!] Error: Local variable is shadowing library function in line %d.", yylineno);
+                                        } else {
+                                              found = symTable.lookup($2, symTable.getScope());
+                                                if (found) {
+                                                        $$ = found;
+                                                } else {
+                                                        SymEntry* entry = new SymEntry;
+                                                        entry->name = $2;
+                                                        entry->type = VAR;
+                                                        entry->scope = symTable.getScope();
+                                                        entry->line = yylineno;
+                                                        entry->isActive = true;
 
-                                        if (found) myerror(&@2, "Error: Identifier already declared in this scope.");
-
-                                        SymEntry* entry = new SymEntry;
-                                        entry->name = $2;
-                                        entry->type = VAR;
-                                        entry->scope = symTable.getScope();
-                                        
-
+                                                        symTable.insert(entry);
+                                                        $$ = entry;
+                                                }
+                                        }
                                         fprintf(yyout, "[-] Reduced: lvalue -> LOCAL IDENTIFIER\n");
                                 }
 
         | DOUBLE_COLON IDENTIFIER       {       
-                                                SymEntry* found = symTable.lookupGlobal($2);
-                                                
+                                                SymEntry* found = symTable.lookup($2, 0);
                                                 if (!found) {
-                                                        myerror(&@2, "Error: Variable not declared in global scope.");
+                                                        fprintf(yyout, "      [!] Error: Token %s has not been declared in global scope in line %d.", $2, yylineno);
+                                                } else {
+                                                        $$ = found;
                                                 }
-
                                                 fprintf(yyout, "[-] Reduced: lvalue -> DOUBLE_COLON IDENTIFIER\n");
                                         }
 
@@ -457,25 +500,51 @@ block: LEFT_BRACE       {
         ;
 
 funcdef: FUNCTION IDENTIFIER LEFT_PARENTHESIS {
-                                                Symentry* found = lookupInCurrentScope($2);
+                                                SymEntry* found = symTable.lookup($2);
 
-                                                if (found) myerror(&@2, "Error: Identifier
+                                                if (found) {
+                                                        if (found->type == LIBFUNC) fprintf(yyout, "      [!] Error : Function shadowing library function in line %d.", yylineno);
+                                                        if (found->type == FUNC && found->scope == symTable.getScope()) fprintf(yyout, "      [!] Error : Function already declared in this scope in line %d.", yylineno);
+                                                        if ((found->type == VAR && found->scope == symTable.getScope()) || (found->type == FORARG && found->scope == symTable.getScope())) fprintf(yyout, "      [!] Error : Function shadowing variable in line %d.", yylineno);
+                                                } else {
+                                                        SymEntry* entry = new SymEntry;
+                                                        entry->name = $2;
+                                                        entry->type = FUNC;
+                                                        entry->scope = symTable.getScope();
+                                                        entry->line = yylineno;
+                                                        entry->isActive = true;
 
+                                                        entry->args.clear();
+                                                        symTable.funcStack.push(entry);
+                                                        symTable.insert(entry);
+                                                }
 
-
-
-
+                                                symTable.enter_scope();
+                                                skipBlockScope = true;
                                                 } idlist RIGHT_PARENTHESIS block {
-                                                                                        funcStack.pop();
+                                                                                        symTable.funcStack.pop();
                                                                                         skipBlockScope = false;
                                                                                         fprintf(yyout, "[-] Reduced: funcdef -> FUNCTION IDENTIFIER LEFT_PARENTHESIS idlist RIGHT_PARENTHESIS block\n");
                                                                                 }
                                                 
         | FUNCTION LEFT_PARENTHESIS     {
+                                                SymEntry* entry = new SymEntry;
 
+                                                entry->name = generateAnonymousName();
+                                                entry->type = FUNC;
+                                                entry->scope = symTable.getScope();
+                                                entry->line = yylineno;
+                                                entry->isActive = true;
+                                                entry->args.clear();
 
+                                                symTable.funcStack.push(entry);
+
+                                                symTable.insert(entry);
+
+                                                symTable.enter_scope();
+                                                skipBlockScope = true;
                                         } idlist RIGHT_PARENTHESIS block        {       
-                                                                                        funcStack.pop();
+                                                                                        symTable.funcStack.pop();
                                                                                         skipBlockScope = false;
                                                                                         fprintf(yyout, "[-] Reduced: funcdef -> FUNCTION LEFT_PARENTHESIS idlist RIGHT_PARENTHESIS block\n");
                                                                                 }
@@ -491,7 +560,6 @@ const:  INTEGER         {
                         }
         
         | STRINGT       {
-                                $$ = $1;
                                 fprintf(yyout, "[-] Reduced: const -> STRING\n");
                         }
 
@@ -509,42 +577,46 @@ const:  INTEGER         {
         ;
 
 idlist: IDENTIFIER      {       
-                                SymEntry* entry = new SymEntry;
-                                entry->name = $1;
-                                entry->type = FORARG;
-                                entry->scope = symTable.getScope();
-                                entry->line = yylineno;
-                                entry->isActive = true;
-                                fprintf(yyout, "Inserting id in symtable\n");
-                                int res = symTable.insert(entry);
+                                SymEntry* found;
 
-                                if (res == 2) myerror(&@1, "Error: Variable already declared in this scope.");
-                                if (res == 3) myerror(&@1, "Error: Cannot shadow lib functions.");
-                                if (res == 4) myerror(&@1, "Error: Cannot shadow user-active functions");
+                                if ((found = symTable.lookup($1, 0))) {
+                                        if (found->type == LIBFUNC) fprintf(yyout, "      [!] Error: Formal argument is shadowing library function in line %d.", yylineno);
 
-                                funcStack.top()->args.push_back(entry);
-                                // print name : forarg of func : name
-                                fprintf(yyout, "[-] Inserting %s as forarg in func %s\n", $1, funcStack.top()->name.c_str());
-
-                                fprintf(yyout, "[-] Reduced: idlist -> IDENTIFIER\n");
-                        }
-        | idlist COMMA IDENTIFIER   {   
+                                } else if ((found = symTable.lookup($1, symTable.getScope()))) {
+                                        if (found->type == FORARG) fprintf(yyout, "      [!] Error: Formal argument already declared in line %d.", yylineno);
+                                } else {
                                         SymEntry* entry = new SymEntry;
-                                        entry->name = $3;
+                                        entry->name = $1;
                                         entry->type = FORARG;
                                         entry->scope = symTable.getScope();
                                         entry->line = yylineno;
                                         entry->isActive = true;
-                                        fprintf(yyout, "Inserting id in symtable\n");
-                                        int res = symTable.insert(entry);
 
-                                        if (res == 2) myerror(&@3, "Error: Variable already declared in this scope.");
-                                        if (res == 3) myerror(&@3, "Error: Cannot shadow lib functions.");
-                                        if (res == 4) myerror(&@3, "Error: Cannot shadow user-active functions");
+                                        symTable.funcStack.top()->args.push_back(entry);
+                                        symTable.insert(entry);
+                                }
+                                
+                                fprintf(yyout, "[-] Reduced: idlist -> IDENTIFIER\n");
+                        }
+        | idlist COMMA IDENTIFIER   {   
+                                        SymEntry* found;
 
-                                        funcStack.top()->args.push_back(entry);
-                                        
-                                        fprintf(yyout, "[-] Inserting %s as forarg in func %s\n", $3, funcStack.top()->name.c_str());
+                                        if ((found = symTable.lookup($3, 0))) {
+                                                if (found->type == LIBFUNC) fprintf(yyout, "      [!] Error: Formal argument is shadowing library function in line %d.", yylineno);
+
+                                        } else if ((found = symTable.lookup($3, symTable.getScope()))) {
+                                                if (found->type == FORARG) fprintf(yyout, "      [!] Error: Formal argument already declared in line %d.", yylineno);
+                                        } else {
+                                                SymEntry* entry = new SymEntry;
+                                                entry->name = $3;
+                                                entry->type = FORARG;
+                                                entry->scope = symTable.getScope();
+                                                entry->line = yylineno;
+                                                entry->isActive = true;
+
+                                                symTable.funcStack.top()->args.push_back(entry);
+                                                symTable.insert(entry);
+                                        }
 
                                         fprintf(yyout, "[-] Reduced: idlist -> idlist COMMA IDENTIFIER\n");
                                     }
@@ -553,9 +625,7 @@ idlist: IDENTIFIER      {
                                 }
         ;
 
-ifstmt: IF LEFT_PARENTHESIS     {
-
-                                } expr RIGHT_PARENTHESIS stmt %prec LOWER_THAN_ELSE   {
+ifstmt: IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt %prec LOWER_THAN_ELSE   {
                                                                                     fprintf(yyout, "[-] Reduced: ifstmt -> IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt\n");
                                                                                 }
 
@@ -596,34 +666,29 @@ returnstmt: RETURN expr SEMICOLON       {
 
 errors: ERROR_COMMENT   {
                                 fprintf(yyout, "[-] Reduced: errors -> ERROR_COMMENT\n");
-                                myerror(&@1, "Error: Invalid comment");
+                                fprintf(yyout, "      [!] Error: Invalid comment in line %d.", yylineno);
                                 exit(1);
                         }
 
         | ERROR_STRING  {
                                 fprintf(yyout, "[-] Reduced: errors -> ERROR_STRING\n");
-                                myerror(&@1, "Error: Invalid string");
+                                fprintf(yyout, "      [!] Error: Invalid string in line %d.", yylineno);
                                 exit(1);
                         }
 
         | ERROR_ESCAPE  {
                                 fprintf(yyout, "[-] Reduced: errors -> ERROR_ESCAPE\n");
-                                myerror(&@1, "Error: Invalid escape sequence");
+                                fprintf(yyout, "      [!] Error: Invalid escape sequence in line %d.", yylineno);
                                 exit(1);
                         }
 
         | UNDEF         {
                                 fprintf(yyout, "[-] Reduced: errors -> UNDEF\n");
-                                myerror(&@1, "Error: Undefined token");     
+                                fprintf(yyout, "      [!] Error: Undefined variable in line %d.", yylineno);    
                                 exit(1);
                         }
         ;
 %%
-
-
-void myerror(YYLTYPE* loc, const char* msg) {
-    fprintf(stderr, "Error at line %d, column %d: %s\n", loc->first_line, loc->first_column, msg);
-}
 
 void yyerror(const char* msg) {
     fprintf(stderr, "Bison error: %s\n", msg);

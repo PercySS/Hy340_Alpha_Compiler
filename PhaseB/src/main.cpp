@@ -1,11 +1,10 @@
 #include "symtable.hpp"
-#include "../out/parser.tab.hpp"    // Include Bison header to get yyparse()
+#include "parser.tab.hpp"    // Include Bison header to get yyparse()
 #include <cstdio>
 #include <cstdlib> 
 
 extern FILE* yyin;
 extern FILE* yyout;
-extern int yydebug;
 
 // Global variables for correct handling of the symbol table
 SymbolTable symTable;
@@ -14,7 +13,6 @@ int rabbitHole = 0;
 
 int main(int argc, char** argv) {
     // handle the input output according to arguments
-    yydebug = 0;
     FILE* input = stdin;
     FILE* output = stdout;
 

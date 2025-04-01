@@ -32,7 +32,7 @@ LDFLAGS  = -lfl
 all: $(TARGET)
 
 # Final linking
-$(TARGET): $(SCANNER_CPP) $(PARSER_CPP) $(SYMTABLE) $(MAIN)
+$(TARGET):  $(SCANNER_CPP) $(SYMTABLE) $(MAIN)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Bison: .y -> .cpp + .hpp

@@ -20,12 +20,62 @@ working 12
 
 inserts
 
-funcdef 2 tick 
+funcdef 2 tick ..
 
-idlist 2 tick
+idlist 2 tick ..
 
 primary lvalue 1 
 
 lvalue ident 2
 
 lvalue local ident 2
+
+
+{
+
+    x = 10;
+
+    x = x + 1;
+
+    x = 15;
+
+    x = x - 2;
+}
+
+psaxnw sto current scope kai an eimaqi se func psaxno kai typika orismtaa an to bro anaferomai ekei an den to vroi ftiaxcno kainoyrio 
+
+
+
+function f() {
+
+    function g() {
+
+    }
+
+
+}
+
+
+
+x = 10;
+
+function f() {
+
+    ::x = 20;
+
+}
+
+x = y = 1; //new variables x, y
+{
+    x = 2; //ok, refers to global x
+    a = 3; //new var a in scope 1
+    function f (z) {
+        x = 4; //ok, refers to global x,
+        a = 5; //error: cannot access  //a in scope 1
+        y = 6; //ok, refers to global y
+        {
+            z = 7; //ok, refers to formal  
+            function g() { return z; } //error: cannot access z
+        }
+    }
+} 

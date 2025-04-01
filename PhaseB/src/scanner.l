@@ -1,10 +1,6 @@
 %{
-#include <memory>
-#include <string>
-#include <iostream>
-#include <stack>
-#include <cstring>
-#include "../out/parser.tab.hpp"
+#include "parser.tab.hpp"
+#include "../src/symtable.hpp"
 
 extern void yyerror(const char* msg);
 
@@ -34,7 +30,6 @@ void append_to_string_buffer(const char* text) {
 %}
 
 /* Options  section */
-%option header-file="out/scanner.hpp"
 %option noyywrap
 %option yylineno
 %option nounput
