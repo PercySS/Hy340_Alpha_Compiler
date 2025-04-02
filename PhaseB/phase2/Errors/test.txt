@@ -79,3 +79,13 @@ x = y = 1; //new variables x, y
         }
     }
 } 
+
+
+func f() {
+
+    local k;
+    if () {
+        k = 10;
+    }
+
+}

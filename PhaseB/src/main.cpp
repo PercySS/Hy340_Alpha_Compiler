@@ -6,6 +6,7 @@
 extern FILE* yyin;
 extern FILE* yyout;
 extern int yyparse();
+extern int yydebug;
 
 // Global variables for correct handling of the symbol table
 SymbolTable symTable;
@@ -14,6 +15,7 @@ int rabbitHole = 0;
 
 int main(int argc, char** argv) {
     // handle the input output according to arguments
+    yydebug = 0;
     FILE* input = stdin;
     FILE* output = stdout;
 

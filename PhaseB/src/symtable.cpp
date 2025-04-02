@@ -2,8 +2,9 @@
 
 SymbolTable::SymbolTable() {
     scope = 0;
-    scopes.push_back(std::vector<std::pair<std::string, SymEntry>>());
-    funcStack.push(nullptr);
+    scopes = std::vector<std::vector<std::pair<std::string, SymEntry>>>();
+    scopes.emplace_back(std::vector<std::pair<std::string, SymEntry>>());
+    funcStack = std::stack<SymEntry*>();
 
     libfuncs = {
         "print", "input", "objectmemberkeys", "objecttotalmembers",
@@ -43,24 +44,24 @@ void SymbolTable::insert(SymEntry* entry) {
 
 
 
-SymEntry* SymbolTable::lookup(const std::string& name, int scope) const {
+SymEntry* SymbolTable::lookup(const std::string& name, int scopet) const {
     assert(!name.empty());
-    assert(scope >= -1 && scope < (int)scopes.size());   
+    assert(scopet >= -1 && scopet < ((int)this->scopes.size()));   
 
     // if scope is -1, search in all scopes
-    if (scope == -1) {
-        for (int i = scopes.size() - 1; i >= 0; --i) {
-            for (const auto& pair : scopes[i]) {
+    if (scopet == -1) {
+        for (int i = this->scopes.size() - 1; i >= 0; --i) {
+            for (const auto& pair : this->scopes[i]) {
                 if (pair.first == name && pair.second.isActive) {
-                    return new SymEntry(pair.second); // return a copy of the entry
+                    return const_cast<SymEntry*>(&pair.second); // return a copy of the entry
                 }
             }
         }
     } else {
         // search in the specified scope
-        for (const auto& pair : scopes[scope]) {
+        for (const auto& pair : scopes[scopet]) {
             if (pair.first == name && pair.second.isActive) {
-                return new SymEntry(pair.second); // return a copy of the entry
+                return const_cast<SymEntry*>(&pair.second); // return a copy of the entry
             }
         }
     }
@@ -80,7 +81,7 @@ void SymbolTable::hide(int scope) {
 void SymbolTable::enter_scope() {
     scope++;
     if ((size_t)scope >= scopes.size()) {
-        scopes.push_back(std::vector<std::pair<std::string, SymEntry>>());
+        scopes.emplace_back(std::vector<std::pair<std::string, SymEntry>>());
     }
 }
 

@@ -18,7 +18,8 @@ typedef enum {
     VAR,
     FUNC,
     LIBFUNC,
-    FORARG
+    FORARG,
+    NONLVAL
 } SymbolType;
 
 typedef struct SymEntry {
