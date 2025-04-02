@@ -1,5 +1,5 @@
 #include "symtable.hpp"
-#include "parser.tab.hpp"    // Include Bison header to get yyparse()
+#include "parser.tab.hpp"
 #include <cstdio>
 #include <cstdlib> 
 
@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
 
     yyin = input;
 
-    // If an output file is provided, open it for writing
+    // if an output file is provided, open it for writing
     FILE* outputFile;
     if (argc == 3) {
         outputFile = fopen(argv[2], "w");
@@ -47,7 +47,6 @@ int main(int argc, char** argv) {
     yyout = output;
 
     
-    // Start parsing
     int result = yyparse();
 
     if (result == 0) {

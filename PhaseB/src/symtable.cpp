@@ -48,7 +48,7 @@ SymEntry* SymbolTable::lookup(const std::string& name, int scopet) const {
     assert(!name.empty());
     assert(scopet >= -1 && scopet < ((int)this->scopes.size()));   
 
-    // if scope is -1, search in all scopes
+    // if scope is -1, search in all scopes from the inner to the outer
     if (scopet == -1) {
         for (int i = this->scopes.size() - 1; i >= 0; --i) {
             for (const auto& pair : this->scopes[i]) {

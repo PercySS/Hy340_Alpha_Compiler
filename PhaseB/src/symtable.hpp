@@ -11,7 +11,6 @@
 #include <cassert>
 #include <cstring>
 #include <vector>
-#include <unordered_map>
 #include <stack>
 
 typedef enum {
