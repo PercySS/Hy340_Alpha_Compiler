@@ -96,21 +96,30 @@ void SymbolTable::exit_scope() {
 }
 
 void SymbolTable::printTable(FILE* output) const {
-    printf("\n======Printing symbol table======");
-    for (int i = 0; (size_t)i < scopes.size(); i++) {
-        fprintf(output, "\n");
-        for (int j = 0; j < i; j++) fprintf(output, "      ");
-        fprintf(output, "Scope %d:\n", i);
-        for (const auto& it : scopes[i]) {
-            fprintf(output, "      ");
-            for (int j = 0; j < i; j++) fprintf(output, "      ");
-            const SymEntry& e = it.second;
-            fprintf(output, "%s [scope: %d, line: %d, active: %d, type: %s]\n",
-                    e.name.c_str(), e.scope, e.line, e.isActive, typeToString(e.type).c_str());
+    fprintf(output, "\n===================== SYMBOL TABLE =====================\n");
+
+    for (size_t i = 0; i < scopes.size(); ++i) {
+        if (scopes[i].empty()) continue;
+
+        fprintf(output, "\n>> Scope %zu\n", i);
+        fprintf(output, "--------------------------------------------------------\n");
+        fprintf(output, "%-20s | %-5s | %-5s | %-6s | %-10s\n", 
+                "Name", "Scope", "Line", "Active", "Type");
+        fprintf(output, "--------------------------------------------------------\n");
+
+        for (const auto& [name, e] : scopes[i]) {
+            fprintf(output, "%-20s | %-5d | %-5d | %-6s | %-10s\n",
+                    e.name.c_str(),
+                    e.scope,
+                    e.line,
+                    e.isActive ? "true" : "false",
+                    typeToString(e.type).c_str());
         }
     }
-    printf("======END OF SYMTABLE======\n\n");
+
+    fprintf(output, "\n=================== END OF SYMTABLE ====================\n\n");
 }
+
 
 std::string typeToString(SymbolType type) {
     switch (type) {

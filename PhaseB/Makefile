@@ -25,7 +25,7 @@ SCANNER_HPP = $(OUT_DIR)/scanner.hpp
 TARGET   = compiler
 
 # Build flags
-CXXFLAGS = -Wall -ansi -pedantic -g -std=c++11 -I$(OUT_DIR)
+CXXFLAGS = -Wall -ansi -pedantic -g -std=c++17 -I$(OUT_DIR)
 LDFLAGS  = -lfl
 
 # Default build
@@ -38,7 +38,7 @@ $(TARGET): $(PARSER_CPP) $(SCANNER_CPP) $(SYMTABLE) $(MAIN)
 # Bison: .y -> .cpp + .hpp
 $(PARSER_CPP) $(PARSER_HPP): $(PARSER)
 	@mkdir -p $(OUT_DIR)
-	$(BISON) -d --defines=$(PARSER_HPP) -o $(PARSER_CPP) $(PARSER)
+	$(BISON) -d -Wcounterexamples --defines=$(PARSER_HPP) -o $(PARSER_CPP) $(PARSER)
 
 # Flex: .l -> .cpp + .hpp
 $(SCANNER_CPP) $(SCANNER_HPP): $(SCANNER)

@@ -15,14 +15,14 @@ extern SymbolTable symTable;
 extern bool skipBlockScope;
 extern int rabbitHole;
 extern int yylex();
+extern char* yytext;
 extern int yylineno;
 extern FILE *yyin;
 extern FILE *yyout;
-void yyerror(const char* msg);
+int yyerror(const char* msg);
 
 // Global variables
 SymEntry* entryFuncDef = nullptr;
-
 %}
 
 
@@ -112,24 +112,22 @@ SymEntry* entryFuncDef = nullptr;
 %type <node> const program stmt_list stmt
 
 
+%nonassoc ELSE
+%nonassoc LOWER_THAN_ELSE
 
-%left ASSIGN PLUS_ASSIGN MINUS_ASSIGN
+%right ASSIGN PLUS_ASSIGN MINUS_ASSIGN
 %left OR
 %left AND 
 %nonassoc EQUAL NOT_EQUAL
 %nonassoc GREATER_THAN GREATER_THAN_EQUAL LESS_THAN LESS_THAN_EQUAL
 %left PLUS MINUS
 %left MULTIPLY DIVIDE MODULO
-%right UMINUS
-%right NOT INCREMENT DECREMENT 
+%right NOT INCREMENT DECREMENT UMINUS
 %left DOT DOUBLE_DOT
 %left LEFT_BRACKET RIGHT_BRACKET
 %left LEFT_PARENTHESIS RIGHT_PARENTHESIS  
-%left RIGHT_BRACE LEFT_BRACE
+%left LEFT_BRACE RIGHT_BRACE
 
-
-%nonassoc LOWER_THAN_ELSE
-%nonassoc ELSE
 
 %%
 program: stmt_list      {       
@@ -158,13 +156,13 @@ stmt: expr SEMICOLON    {
                         }
 
         | returnstmt    {
-                                if (symTable.funcStack.empty()) fprintf(yyout, "      [!] Error: Return statement outside of function in line %d.", yylineno);
+                                if (symTable.funcStack.empty()) fprintf(yyout, "      [!] Error: Return statement outside of function in line %d.\n", yylineno);
                                 $$ = $1;
                                 fprintf(yyout, "[-] Reduced: stmt -> returnstmt\n");
                         }
 
         | BREAK SEMICOLON       {       
-                                        if (rabbitHole < 1)  fprintf(yyout, "      [!] Error: Break statement outside of loop in line %d.", yylineno);
+                                        if (rabbitHole < 1)  fprintf(yyout, "      [!] Error: Break statement outside of loop in line %d.\n", yylineno);
                                         SymEntry* dummy = new SymEntry;
                                         dummy->type = VAR;
                                         $$ = dummy;
@@ -172,7 +170,7 @@ stmt: expr SEMICOLON    {
                                 }
 
         | CONTINUE SEMICOLON    {       
-                                        if (rabbitHole < 1) fprintf(yyout, "      [!] Error: Continue statement outside of loop in line %d.", yylineno);
+                                        if (rabbitHole < 1) fprintf(yyout, "      [!] Error: Continue statement outside of loop in line %d.\n", yylineno);
                                         SymEntry* dummy = new SymEntry;
                                         dummy->type = VAR;
                                         $$ = dummy;
@@ -200,19 +198,23 @@ stmt: expr SEMICOLON    {
                                         $$ = $1;
                                         fprintf(yyout, "[-] Reduced: stmt -> errors\n");
                                 }
+
+        
+        | error SEMICOLON       {       
+                                        fprintf(yyout, "      [!] Error: Illegal statement in line %d.\n", yylineno);
+                                        yyerrok;
+                                        yyclearin;
+                                }
+        
         ;
     
 stmt_list:  stmt stmt_list      {
-                                        SymEntry* dummy = new SymEntry;
-                                        dummy->type = VAR;
-                                        $$ = dummy;
+                                        $$ = nullptr;
                                         fprintf(yyout, "[-] Reduced: stmt_list -> stmt stmt_list\n");
                                 }
 
             | /* empty */       {       
-                                        SymEntry* dummy = new SymEntry;
-                                        dummy->type = VAR;
-                                        $$ = dummy;    
+                                        $$ = nullptr;    
                                         fprintf(yyout, "[-] Reduced: stmt_list -> /* empty */\n");
                                 }
             ;
@@ -337,38 +339,42 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
                                                 }
 
         | INCREMENT lvalue                      {       
-                                                        if ($2 && $2->type == FUNC)
-                                                                fprintf(yyout, "      [!] Error: Cannot use function as lvalue (++func) in line %d.\n", yylineno);
-                                                        if ($2 && $2->type == LIBFUNC)
-                                                                fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (++libfunc) in line %d.\n", yylineno);
-                                                        $$ = $2;
+                                                        if ($2->type == LIBFUNC) fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (++libfunc) in line %d.\n", yylineno);
+                                                        if ($2->type == FUNC) fprintf(yyout, "      [!] Error: Cannot use function as lvalue (++func) in line %d.\n", yylineno);
+                                                        if ($2->type == NONLVAL) fprintf(yyout, "      [!] Error: Cannot use non-lvalue as lvalue (++nonlval) in line %d.\n", yylineno);
+                                                        SymEntry* dummy = new SymEntry;
+                                                        dummy->type = NONLVAL;
+                                                        $$ = dummy;
                                                         fprintf(yyout, "[-] Reduced: term -> INCREMENT lvalue\n");
                                                 }
 
         | lvalue INCREMENT                      {       
-                                                        if ($1 && $1->type == FUNC)
-                                                                fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func++) in line %d.\n", yylineno);
-                                                        if ($1 && $1->type == LIBFUNC)
-                                                                fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (libfunc++) in line %d.\n", yylineno);
-                                                        $$ = $1;
+                                                        if ($1->type == LIBFUNC) fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (libfunc++) in line %d.\n", yylineno);
+                                                        if ($1->type == FUNC) fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func++) in line %d.\n", yylineno);
+                                                        if ($1->type == NONLVAL) fprintf(yyout, "      [!] Error: Cannot use non-lvalue as lvalue (nonlval++) in line %d.\n", yylineno);
+                                                        SymEntry* dummy = new SymEntry;
+                                                        dummy->type = NONLVAL;
+                                                        $$ = dummy;
                                                         fprintf(yyout, "[-] Reduced: term -> lvalue INCREMENT\n");
                                                 }
 
         | DECREMENT lvalue                      {       
-                                                        if ($2 && $2->type == FUNC)
-                                                                fprintf(yyout, "      [!] Error: Cannot use function as lvalue (--func) in line %d.\n", yylineno);
-                                                        if ($2 && $2->type == LIBFUNC)
-                                                                fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (--libfunc) in line %d.\n", yylineno);
-                                                        $$ = $2;
+                                                        if ($2->type == LIBFUNC) fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (--libfunc) in line %d.\n", yylineno);
+                                                        if ($2->type == FUNC) fprintf(yyout, "      [!] Error: Cannot use function as lvalue (--func) in line %d.\n", yylineno);
+                                                        if ($2->type == NONLVAL) fprintf(yyout, "      [!] Error: Cannot use non-lvalue as lvalue (--nonlval) in line %d.\n", yylineno);
+                                                        SymEntry* dummy = new SymEntry;
+                                                        dummy->type = NONLVAL;
+                                                        $$ = dummy;
                                                         fprintf(yyout, "[-] Reduced: term -> DECREMENT lvalue\n");
                                                 }
 
         | lvalue DECREMENT                      {
-                                                        if ($1 && $1->type == FUNC)
-                                                                fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func--) in line %d.\n", yylineno);
-                                                        if ($1 && $1->type == LIBFUNC)
-                                                                fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (libfunc--) in line %d.\n", yylineno);
-                                                        $$ = $1;
+                                                        if ($1->type == LIBFUNC) fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (libfunc--) in line %d.\n", yylineno);
+                                                        if ($1->type == FUNC) fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func--) in line %d.\n", yylineno);
+                                                        if ($1->type == NONLVAL) fprintf(yyout, "      [!] Error: Cannot use non-lvalue as lvalue (nonlval--) in line %d.\n", yylineno);
+                                                        SymEntry* dummy = new SymEntry;
+                                                        dummy->type = NONLVAL;
+                                                        $$ = dummy;
                                                         fprintf(yyout, "[-] Reduced: term -> lvalue DECREMENT\n");
                                                 }        
         
@@ -379,30 +385,32 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
         ;
 
 assignexpr:     lvalue ASSIGN expr              {       
-                                                        if ($1->type == FUNC || $1->type == LIBFUNC) {
-                                                                fprintf(yyout, "Error: Cannot assign to function\n");
-                                                        } else if ($1->type == NONLVAL) {
-                                                                fprintf(yyout, "Error: Left side of assignment must be a variable\n");
-                                                        }
-                                                        $$ = $1;
+                                                        if ($1->type == LIBFUNC) fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (libfunc = expr) in line %d.\n", yylineno);
+                                                        if ($1->type == FUNC) fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func = expr) in line %d.\n", yylineno);
+                                                        if ($1->type == NONLVAL) fprintf(yyout, "      [!] Error: Cannot use non-lvalue as lvalue (nonlval = expr) in line %d.\n", yylineno);
+                                                        SymEntry* dummy = new SymEntry;
+                                                        dummy->type = NONLVAL;
+                                                        $$ = dummy;
                                                         fprintf(yyout, "[-] Reduced: assignexpr -> lvalue ASSIGN expr\n");
                                                 }
 
                 | lvalue PLUS_ASSIGN expr       {       
-                                                        if ($1 && $1->type == FUNC)
-                                                                fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func += expr) in line %d.\n", yylineno);
-                                                        if ($1 && $1->type == LIBFUNC)
-                                                                fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (libfunc += expr) in line %d.\n", yylineno);
-                                                        $$ = $1;
+                                                        if ($1->type == LIBFUNC) fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (libfunc += expr) in line %d.\n", yylineno);
+                                                        if ($1->type == FUNC) fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func += expr) in line %d.\n", yylineno);
+                                                        if ($1->type == NONLVAL) fprintf(yyout, "      [!] Error: Cannot use non-lvalue as lvalue (nonlval += expr) in line %d.\n", yylineno);
+                                                        SymEntry* dummy = new SymEntry;
+                                                        dummy->type = NONLVAL;
+                                                        $$ = dummy;
                                                         fprintf(yyout, "[-] Reduced: assignexpr -> lvalue PLUS_ASSIGN expr\n");
                                                 }
 
                 | lvalue MINUS_ASSIGN expr      {
-                                                        if ($1 && $1->type == FUNC)
-                                                                fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func -= expr) in line %d.\n", yylineno);
-                                                        if ($1 && $1->type == LIBFUNC)
-                                                                fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (libfunc -= expr) in line %d.\n", yylineno);
-                                                        $$ = $1;
+                                                        if ($1->type == LIBFUNC) fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (libfunc -= expr) in line %d.\n", yylineno);
+                                                        if ($1->type == FUNC) fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func -= expr) in line %d.\n", yylineno);
+                                                        if ($1->type == NONLVAL) fprintf(yyout, "      [!] Error: Cannot use non-lvalue as lvalue (nonlval -= expr) in line %d.\n", yylineno);
+                                                        SymEntry* dummy = new SymEntry;
+                                                        dummy->type = NONLVAL;
+                                                        $$ = dummy;
                                                         fprintf(yyout, "[-] Reduced: assignexpr -> lvalue MINUS_ASSIGN expr\n");
                                                 }
                 ;
@@ -449,9 +457,7 @@ lvalue: IDENTIFIER              {
                                                 $$ = entry;
                                         } else {    
                                                 if (found->type == LIBFUNC) {
-                                                        SymEntry* dummy = new SymEntry;
-                                                        dummy->type = NONLVAL;
-                                                        $$ = dummy;
+                                                        $$ = found;
                                                 }
 
                                                 if (found->type == VAR || found->type == FORARG) {
@@ -500,7 +506,7 @@ lvalue: IDENTIFIER              {
         | DOUBLE_COLON IDENTIFIER       {       
                                                 SymEntry* found = symTable.lookup($2, 0);
                                                 if (!found) {
-                                                        fprintf(yyout, "      [!] Error: Token %s has not been declared in global scope in line %d.", $2, yylineno);
+                                                        fprintf(yyout, "      [!] Error: Token %s has not been declared in global scope in line %d.\n", $2, yylineno);
                                                         SymEntry* dummy = new SymEntry;
                                                         dummy->type = VAR;
                                                         $$ = dummy;
@@ -511,9 +517,7 @@ lvalue: IDENTIFIER              {
                                         }
 
         | member                        {       
-                                                SymEntry* dummy = new SymEntry;
-                                                dummy->type = NONLVAL;
-                                                $$ = dummy;
+                                                $$ = $1;
                                                 fprintf(yyout, "[-] Reduced: lvalue -> member\n");
                                         }
         ;
@@ -555,9 +559,7 @@ call:   call LEFT_PARENTHESIS elist RIGHT_PARENTHESIS   {
                                                         }
 
         | lvalue callsuffix                             {
-                                                                SymEntry* dummy = new SymEntry;
-                                                                dummy->type = NONLVAL;
-                                                                $$ = dummy;
+                                                                $$ = $1;
                                                                 fprintf(yyout, "[-] Reduced: call -> lvalue callsuffix\n");
                                                         }
 
@@ -601,23 +603,17 @@ methodcall: DOUBLE_DOT IDENTIFIER LEFT_PARENTHESIS elist RIGHT_PARENTHESIS      
             ;
 
 elist: expr                     {       
-                                        SymEntry* dummy = new SymEntry;
-                                        dummy->type = VAR;
-                                        $$ = dummy;
+                                        $$ = nullptr;
                                         fprintf(yyout, "[-] Reduced: elist -> expr\n");
                                 }
 
         | elist COMMA expr      {       
-                                        SymEntry* dummy = new SymEntry;
-                                        dummy->type = VAR;
-                                        $$ = dummy;
+                                        $$ = nullptr;
                                         fprintf(yyout, "[-] Reduced: elist -> expr COMMA elist\n");
                                 }
 
         | /* empty */           {       
-                                        SymEntry* dummy = new SymEntry;
-                                        dummy->type = VAR;
-                                        $$ = dummy;
+                                        $$ = nullptr;
                                         fprintf(yyout, "[-] Reduced: elist -> /* empty */\n");
                                 }
         ;
@@ -638,24 +634,18 @@ objectdef: LEFT_BRACKET elist RIGHT_BRACKET     {
         ;
 
 indexed: indexedelem                            {
-                                                        SymEntry* dummy = new SymEntry;
-                                                        dummy->type = VAR;
-                                                        $$ = dummy;
+                                                        $$ = nullptr;
                                                         fprintf(yyout, "[-] Reduced: indexed -> indexedelem\n");
                                                 }
 
         | indexed COMMA indexedelem             {
-                                                        SymEntry* dummy = new SymEntry;
-                                                        dummy->type = VAR;
-                                                        $$ = dummy;
+                                                        $$ = nullptr;
                                                         fprintf(yyout, "[-] Reduced: indexed -> indexed COMMA indexedelem\n");
                                                 }
         ;
 
 indexedelem: LEFT_BRACE expr COLON expr RIGHT_BRACE     {
-                                                                SymEntry* dummy = new SymEntry;
-                                                                dummy->type = VAR;
-                                                                $$ = dummy;
+                                                                $$ = nullptr;
                                                                 fprintf(yyout, "[-] Reduced: indexedelem -> LEFT_BRACE expr COLON expr RIGHT_BRACE\n");
                                                         }
             ;
@@ -680,7 +670,7 @@ funcdef: FUNCTION IDENTIFIER LEFT_PARENTHESIS   {
                                                         SymEntry* entry = nullptr;
 
                                                         if (found && found->type == LIBFUNC) {
-                                                                fprintf(yyout, "      [!] Error : Function shadowing library function in line %d.", yylineno);
+                                                                fprintf(yyout, "      [!] Error : Function shadowing library function in line %d.\n", yylineno);
                                                         } else {
                                                                 found = symTable.lookup($2, symTable.getScope());
 
@@ -695,19 +685,17 @@ funcdef: FUNCTION IDENTIFIER LEFT_PARENTHESIS   {
                                                                         symTable.funcStack.push(entry);
                                                                         entry->args.clear();
                                                                         symTable.insert(entry);
-                                                                        fprintf(yyout, "\n                       %s\n", symTable.funcStack.top()->name.c_str());
-                                                                        
                                                                 } else {
                                                                         if (found->type == FUNC) {
-                                                                                fprintf(yyout, "      [!] Error: Function %s already declared in line %d.", $2, yylineno);
+                                                                                fprintf(yyout, "      [!] Error: Function %s already declared in line %d.\n", $2, yylineno);
                                                                         }
                                                                         
                                                                         if (found->type == VAR) {
-                                                                                fprintf(yyout, "      [!] Error: Function %s is shadowing variable in line %d.", $2, yylineno);
+                                                                                fprintf(yyout, "      [!] Error: Function %s is shadowing variable in line %d.\n", $2, yylineno);
                                                                         }
                                                                         
                                                                         if (found->type == FORARG) {
-                                                                                fprintf(yyout, "      [!] Error: Function %s is shadowing formal argument in line %d.", $2, yylineno);
+                                                                                fprintf(yyout, "      [!] Error: Function %s is shadowing formal argument in line %d.\n", $2, yylineno);
                                                                         }
                                                                 }
 
@@ -715,8 +703,7 @@ funcdef: FUNCTION IDENTIFIER LEFT_PARENTHESIS   {
                                                                 skipBlockScope = true;
                                                                 entryFuncDef = entry;
                                                         }
-                                                } idlist RIGHT_PARENTHESIS block {      
-                                                                                        fprintf(yyout, "                    Igot out!\n");
+                                                } idlist RIGHT_PARENTHESIS block {
                                                                                         if (!symTable.funcStack.empty()) {
                                                                                                 symTable.funcStack.pop();
                                                                                         } 
@@ -751,44 +738,32 @@ funcdef: FUNCTION IDENTIFIER LEFT_PARENTHESIS   {
         ;
         
 const:  INTEGER         {       
-                                SymEntry* dummy = new SymEntry;
-                                dummy->type = VAR;
-                                $$ = dummy;
+                                $$ = nullptr;
                                 fprintf(yyout, "[-] Reduced: const -> INTEGER\n");
                         }
 
         | REAL          {       
-                                SymEntry* dummy = new SymEntry;
-                                dummy->type = VAR;
-                                $$ = dummy;
+                                $$ = nullptr;
                                 fprintf(yyout, "[-] Reduced: const -> REAL\n");
                         }
         
         | STRINGT       {       
-                                SymEntry* dummy = new SymEntry;
-                                dummy->type = VAR;
-                                $$ = dummy;
+                                $$ = nullptr;
                                 fprintf(yyout, "[-] Reduced: const -> STRING\n");
                         }
 
         | TRUE          {       
-                                SymEntry* dummy = new SymEntry;
-                                dummy->type = VAR;
-                                $$ = dummy;
+                                $$ = nullptr;
                                 fprintf(yyout, "[-] Reduced: const -> TRUE\n");
                         }
 
         | FALSE         {       
-                                SymEntry* dummy = new SymEntry;
-                                dummy->type = VAR;
-                                $$ = dummy;
+                                $$ = nullptr;
                                 fprintf(yyout, "[-] Reduced: const -> FALSE\n");
                         }
 
         | NIL           {
-                                SymEntry* dummy = new SymEntry;
-                                dummy->type = VAR;
-                                $$ = dummy;
+                                $$ = nullptr;
                                 fprintf(yyout, "[-] Reduced: const -> NIL\n");
                         }
         ;
@@ -797,12 +772,12 @@ idlist: IDENTIFIER      {
                                 SymEntry* found;
 
                                 if ((found = symTable.lookup($1, 0)) && found->type == LIBFUNC) {
-                                        fprintf(yyout, "      [!] Error: Formal argument is shadowing library function in line %d.", yylineno);
+                                        fprintf(yyout, "      [!] Error: Formal argument is shadowing library function in line %d.\n", yylineno);
 
                                         $$ = found;
                                 } else {
                                         if ((found = symTable.lookup($1, symTable.getScope()))) {
-                                                if (found->type == FORARG) fprintf(yyout, "      [!] Error: Formal argument already declared in line %d.", yylineno);
+                                                if (found->type == FORARG) fprintf(yyout, "      [!] Error: Formal argument already declared in line %d.\n", yylineno);
                                         } else {
                                                 SymEntry* entry = new SymEntry;
                                                 entry->name = $1;
@@ -825,11 +800,11 @@ idlist: IDENTIFIER      {
                                         SymEntry* found;
 
                                         if ((found = symTable.lookup($3, 0)) && found->type == LIBFUNC) {
-                                                fprintf(yyout, "      [!] Error: Formal argument is shadowing library function in line %d.", yylineno);
+                                                fprintf(yyout, "      [!] Error: Formal argument is shadowing library function in line %d.\n", yylineno);
                                                 $$ = found;
                                         } else {
                                                 if ((found = symTable.lookup($3, symTable.getScope()))) {
-                                                        if (found->type == FORARG) fprintf(yyout, "      [!] Error: Formal argument already declared in line %d.", yylineno);
+                                                        if (found->type == FORARG) fprintf(yyout, "      [!] Error: Formal argument already declared in line %d.\n", yylineno);
                                                 } else {
                                                         SymEntry* entry = new SymEntry;
                                                         entry->name = $3;
@@ -858,16 +833,12 @@ idlist: IDENTIFIER      {
         ;
 
 ifstmt: IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt %prec LOWER_THAN_ELSE   {       
-                                                                                        SymEntry* dummy = new SymEntry;
-                                                                                        dummy->type = VAR;
-                                                                                        $$ = dummy;
+                                                                                        $$ = nullptr;
                                                                                         fprintf(yyout, "[-] Reduced: ifstmt -> IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt\n");
                                                                                 }
 
         | ifstmt ELSE stmt              {
-                                                SymEntry* dummy = new SymEntry;
-                                                dummy->type = VAR;
-                                                $$ = dummy;
+                                                $$ = nullptr;
                                                 fprintf(yyout, "[-] Reduced: ifstmt -> IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt ELSE stmt\n");
                                         }
         ;
@@ -876,9 +847,7 @@ whilestmt: WHILE LEFT_PARENTHESIS       {
                                                 rabbitHole++;
                                         } expr RIGHT_PARENTHESIS stmt   {       
                                                                                 rabbitHole--;
-                                                                                SymEntry* dummy = new SymEntry;
-                                                                                dummy->type = VAR;
-                                                                                $$ = dummy;
+                                                                                $$ = nullptr;
                                                                                 fprintf(yyout, "[-] Reduced: whilestmt -> WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt\n");
                                                                         }
         ;
@@ -887,23 +856,17 @@ forstmt: FOR LEFT_PARENTHESIS   {
                                         rabbitHole++;
                                 } elist SEMICOLON expr SEMICOLON elist RIGHT_PARENTHESIS stmt   {       
                                                                                                         rabbitHole--;
-                                                                                                        SymEntry* dummy = new SymEntry;
-                                                                                                        dummy->type = VAR;
-                                                                                                        $$ = dummy;
+                                                                                                        $$ = nullptr;
                                                                                                         fprintf(yyout, "[-] Reduced: forstmt -> FOR LEFT_PARENTHESIS elist SEMICOLON expr SEMICOLON elist RIGHT_PARENTHESIS stmt\n");
                                                                                                 }
         ;
 
 returnstmt: RETURN expr SEMICOLON       {
-                                                SymEntry* dummy = new SymEntry;
-                                                dummy->type = VAR;
-                                                $$ = dummy;
+                                                $$ = nullptr;
                                                 fprintf(yyout, "[-] Reduced: returnstmt -> RETURN expr SEMICOLON\n");
                                         }
             | RETURN SEMICOLON          {       
-                                                SymEntry* dummy = new SymEntry;
-                                                dummy->type = VAR;
-                                                $$ = dummy;
+                                                $$ = nullptr;
                                                 fprintf(yyout, "[-] Reduced: returnstmt -> RETURN SEMICOLON\n");
                                         }
             ;
@@ -913,7 +876,7 @@ errors: ERROR_COMMENT   {
                                 dummy->type = VAR;
                                 $$ = dummy;
                                 fprintf(yyout, "[-] Reduced: errors -> ERROR_COMMENT\n");
-                                fprintf(yyout, "      [!] Error: Invalid comment in line %d.", yylineno);
+                                fprintf(yyout, "      [!] Error: Invalid comment in line %d.\n", yylineno);
                                 exit(1);
                         }
 
@@ -922,7 +885,7 @@ errors: ERROR_COMMENT   {
                                 dummy->type = VAR;
                                 $$ = dummy;
                                 fprintf(yyout, "[-] Reduced: errors -> ERROR_STRING\n");
-                                fprintf(yyout, "      [!] Error: Invalid string in line %d.", yylineno);
+                                fprintf(yyout, "      [!] Error: Invalid string in line %d.\n", yylineno);
                                 exit(1);
                         }
 
@@ -931,7 +894,7 @@ errors: ERROR_COMMENT   {
                                 dummy->type = VAR;
                                 $$ = dummy;
                                 fprintf(yyout, "[-] Reduced: errors -> ERROR_ESCAPE\n");
-                                fprintf(yyout, "      [!] Error: Invalid escape sequence in line %d.", yylineno);
+                                fprintf(yyout, "      [!] Error: Invalid escape sequence in line %d.\n", yylineno);
                                 exit(1);
                         }
 
@@ -940,12 +903,13 @@ errors: ERROR_COMMENT   {
                                 dummy->type = VAR;
                                 $$ = dummy;
                                 fprintf(yyout, "[-] Reduced: errors -> UNDEF\n");
-                                fprintf(yyout, "      [!] Error: Undefined variable in line %d.", yylineno);    
+                                fprintf(yyout, "      [!] Error: Undefined variable in line %d.\n", yylineno);    
                                 exit(1);
                         }
         ;
 %%
 
-void yyerror(const char* msg) {
-    fprintf(stderr, "Bison error: %s\n", msg);
+int yyerror(const char *msg) {
+    fprintf(stderr, "      [Line %d] Syntax error: %s (near token: \"%s\")\n", yylineno, msg, yytext);
+    return 0;
 }
