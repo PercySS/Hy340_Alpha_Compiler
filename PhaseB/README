@@ -4,7 +4,7 @@ csd4676 Dimitrios Makrogiannis.
 csd4621 Katerina Gyparaki.
 csd5140 Kallia Samaritaki.
 
-The program is able to recognize the following tokens:
+The lexer is able to recognize the following tokens:
 Keywords for alpha language.
 Identifiers.
 Numbers(Integers/Real).
@@ -13,7 +13,19 @@ Punctuation symbols.
 Strings.
 Comments.
 
-Runs in oneiro server with the following command
+The parser is able to recognize:
+All the rules given.
+Logical errors.
+Syntax errors.
+Syntax errors do not stop the parser they just getting skipped and parser
+clean starts from next statement.
+The parser only stops when found (in lexing):
+	1) Unclosed block comments.
+	2) Unclosed strings.
+	3) Undefined tokens.
+	4) Illegal escapes. 
+
+Runs in portokali server with the following command
 make clean
-make all
-./scanner.exe input_file output_file("optional")
+make all/ make
+./compiler <input_file> [output_file]("optional")

@@ -27,6 +27,7 @@ typedef struct SymEntry {
     int scope;
     int line;
     bool isActive;
+    bool isGlobal = false;
     std::vector<SymEntry*> args;
 } SymEntry;
 
@@ -56,7 +57,7 @@ private:
     std::vector<std::vector<std::pair<std::string, SymEntry>>> scopes;
 };
 
-std::string typeToString(SymbolType type);
+std::string typeToString(SymEntry type);
 
 std::string generateAnonymousName();
 

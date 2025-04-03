@@ -96,16 +96,16 @@ void SymbolTable::exit_scope() {
 }
 
 void SymbolTable::printTable(FILE* output) const {
-    fprintf(output, "\n===================== SYMBOL TABLE =====================\n");
+    fprintf(output, "\n====================== SYMBOL TABLE ======================\n");
 
     for (size_t i = 0; i < scopes.size(); ++i) {
         if (scopes[i].empty()) continue;
 
         fprintf(output, "\n>> Scope %zu\n", i);
-        fprintf(output, "--------------------------------------------------------\n");
+        fprintf(output, "----------------------------------------------------------\n");
         fprintf(output, "%-20s | %-5s | %-5s | %-6s | %-10s\n", 
                 "Name", "Scope", "Line", "Active", "Type");
-        fprintf(output, "--------------------------------------------------------\n");
+        fprintf(output, "----------------------------------------------------------\n");
 
         for (const auto& [name, e] : scopes[i]) {
             fprintf(output, "%-20s | %-5d | %-5d | %-6s | %-10s\n",
@@ -113,18 +113,18 @@ void SymbolTable::printTable(FILE* output) const {
                     e.scope,
                     e.line,
                     e.isActive ? "true" : "false",
-                    typeToString(e.type).c_str());
+                    typeToString(e).c_str());
         }
     }
 
-    fprintf(output, "\n=================== END OF SYMTABLE ====================\n\n");
+    fprintf(output, "\n==================== END OF SYMTABLE =====================\n\n");
 }
 
 
-std::string typeToString(SymbolType type) {
-    switch (type) {
-        case VAR: return "VAR";
-        case FUNC: return "FUNC";
+std::string typeToString(SymEntry entry) {
+    switch (entry.type) {
+        case VAR: return entry.isGlobal ? "GLOBAL_VAR" : "LOCAL_VAR";
+        case FUNC: return "USER_FUNC";
         case LIBFUNC: return "LIBFUNC";
         case FORARG: return "FORARG";
         default: return "UNKNOWN";

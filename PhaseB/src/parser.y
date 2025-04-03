@@ -452,7 +452,7 @@ lvalue: IDENTIFIER              {
                                                 entry->scope = symTable.getScope();
                                                 entry->line = yylineno;
                                                 entry->isActive = true;
-
+                                                entry->isGlobal = entry->scope == 0 ? true : false;
                                                 symTable.insert(entry);
                                                 $$ = entry;
                                         } else {    
@@ -495,7 +495,6 @@ lvalue: IDENTIFIER              {
                                                         entry->scope = symTable.getScope();
                                                         entry->line = yylineno;
                                                         entry->isActive = true;
-
                                                         symTable.insert(entry);
                                                         $$ = entry;
                                                 }
