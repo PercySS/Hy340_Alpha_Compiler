@@ -1,0 +1,140 @@
+den doulevoun 
+errors
+
+0
+3
+7
+9
+
+working
+block
+grammar
+random
+simple
+tree
+
+21 total
+not working 9
+working 12
+
+
+inserts
+
+funcdef 2 tick ..
+
+idlist 2 tick ..
+
+primary lvalue 1 
+
+lvalue ident 2
+
+lvalue local ident 2
+
+
+{
+
+    x = 10;
+
+    x = x + 1;
+
+    x = 15;
+
+    x = x - 2;
+}
+
+psaxnw sto current scope kai an eimaqi se func psaxno kai typika orismtaa an to bro anaferomai ekei an den to vroi ftiaxcno kainoyrio 
+
+
+
+function f() {
+
+    function g() {
+
+    }
+
+
+}
+
+
+
+x = 10;
+
+function f() {
+
+    ::x = 20;
+
+}
+
+x = y = 1; //new variables x, y
+{
+    x = 2; //ok, refers to global x
+    a = 3; //new var a in scope 1
+    function f (z) {
+        x = 4; //ok, refers to global x,
+        a = 5; //error: cannot access  //a in scope 1
+        y = 6; //ok, refers to global y
+        {
+            z = 7; //ok, refers to formal  
+            function g() { return z; } //error: cannot access z
+        }
+    }
+} 
+
+
+func f() {
+
+    local k;
+    if () {
+        k = 10;
+    }
+
+}
+
+
+
+a = b = g = d 
+
+++(x-a)
+
+inccrement (x-a)
+increment (     x- a)
+
+increment(x         - a)
+increment (lvalue    -a)
+increment (primary  - a)
+increment (term     - a)
+increment (expr     - a)
+increment (expr-        a)
+increment (expr - a     )
+increment (expr - expr   )
+increment (expr      )
+increment (expr)
+increment term
+increment expr
+syntax error
+
+
+term increment unexptected token near ++ 
+
+
+x = (function() + 10);
+lvalue = (function() + 10);
+lvalue = (                         function() + 10);
+lvalue = (lvalue                   () + 10);
+lvalue = (lvalue()                 + 10);
+lvalue = (lvalue (elist)        + 10);
+lvalue = (lvalue normcall      + 10);
+lvalue = (lvalue callsufix    + 10);
+lvalue = (call +                10);
+lvalue = (primary +            10);
+lvalue = (term +            10);
+lvalue = (expr +            10);
+lvalue = (expr + expr       );
+lvalue = (expr             );
+lvalue = (expr)             ;
+lvalue = expr             ;
+asssignment                 ;
+expr            ;
+stmt 
+stmt-list 
+program        
