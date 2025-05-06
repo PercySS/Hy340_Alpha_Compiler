@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "../src/symtable.hpp"
+#include "../src/iopcode.hpp"
 
 extern SymbolTable symTable;
 extern bool skipBlockScope;
@@ -33,6 +34,7 @@ SymEntry* entryFuncDef = nullptr;
     float float_val;
     char* str_val;
     struct SymEntry* node;
+    struct expr* expr;
 }
 
 
@@ -102,14 +104,15 @@ SymEntry* entryFuncDef = nullptr;
 %token UNDEF
 
 
-%type <node> expr term
-%type <node> lvalue call primary objectdef
-%type <node> assignexpr
+%type <expr> expr term
+%type <expr> lvalue call primary objectdef
+%type <expr> assignexpr
 %type <node> callsuffix normcall methodcall
 %type <node> elist indexed indexedelem block funcdef returnstmt ifstmt whilestmt forstmt member
 %type <node> idlist
 %type <node> errors
-%type <node> const program stmt_list stmt
+%type <expr> const
+%type <node> program stmt_list stmt
 
 
 %nonassoc LOWER_THAN_ELSE
@@ -454,24 +457,27 @@ lvalue: IDENTIFIER              {
                                                 entry->isActive = true;
                                                 entry->isGlobal = entry->scope == 0 ? true : false;
                                                 symTable.insert(entry);
-                                                $$ = entry;
+
+                                                $$ = lvalue_expr(entry);
                                         } else {    
                                                 if (found->type == LIBFUNC) {
-                                                        $$ = found;
+                                                        $$ = newexpr(libraryfunc_e);
+                                                        $$->sym = found;
                                                 }
 
                                                 if (found->type == VAR || found->type == FORARG) {
                                                         if (symTable.funcStack.empty()) {
-                                                                $$ = found;
+                                                                $$ = lvalue_expr(found);
                                                         } else {
                                                                 if ((found->scope > symTable.funcStack.top()->scope && found->isActive) || found->scope == 0) {
-                                                                        $$ = found;
+                                                                        $$ = lvalue_expr(found);
                                                                 } else {
-                                                                     fprintf(yyout, "      [!] Error: Variable %s is not accessible in line %d.\n", $1, yylineno); 
+                                                                        fprintf(yyout, "      [!] Error: Variable %s is not accessible in line %d.\n", $1, yylineno); 
+                                                                        $$ = newexpr(nil_e);
                                                                 }
                                                         }
                                                 } else {
-                                                        $$ = found;
+                                                        $$ = lvalue_expr(found);
                                                 }
                                         }
 
@@ -482,12 +488,13 @@ lvalue: IDENTIFIER              {
                                         SymEntry* found;
                                         if ((found = symTable.lookup($2, 0)) && found->type == LIBFUNC) {
                                                 fprintf(yyout, "      [!] Error: Local variable is shadowing library function in line %d.\n", yylineno);
+                                                $$ = newexpr(nil_e);
                                         } else if (!found || found->type != LIBFUNC) {
                                         
                                                 found = symTable.lookup($2, symTable.getScope());
 
                                                 if (found) {
-                                                        $$ = found;
+                                                        $$ = lvalue_expr(found);
                                                 } else {
                                                         SymEntry* entry = new SymEntry;
                                                         entry->name = $2;
@@ -496,7 +503,8 @@ lvalue: IDENTIFIER              {
                                                         entry->line = yylineno;
                                                         entry->isActive = true;
                                                         symTable.insert(entry);
-                                                        $$ = entry;
+                                                        $$ = lvalue_expr(entry);
+
                                                 }
                                         } 
                                         fprintf(yyout, "[-] Reduced: lvalue -> LOCAL IDENTIFIER\n");
@@ -506,11 +514,9 @@ lvalue: IDENTIFIER              {
                                                 SymEntry* found = symTable.lookup($2, 0);
                                                 if (!found) {
                                                         fprintf(yyout, "      [!] Error: Token %s has not been declared in global scope in line %d.\n", $2, yylineno);
-                                                        SymEntry* dummy = new SymEntry;
-                                                        dummy->type = VAR;
-                                                        $$ = dummy;
+                                                        $$ = newexpr(nil_e);
                                                 } else {
-                                                        $$ = found;
+                                                        $$ = lvalue_expr(found);
                                                 }
                                                 fprintf(yyout, "[-] Reduced: lvalue -> DOUBLE_COLON IDENTIFIER\n");
                                         }
@@ -737,32 +743,39 @@ funcdef: FUNCTION IDENTIFIER LEFT_PARENTHESIS   {
         ;
         
 const:  INTEGER         {       
-                                $$ = nullptr;
+                                $$ == newexpr_constnum(yylval.int_val);
+                                $$->type = constnum_e; 
                                 fprintf(yyout, "[-] Reduced: const -> INTEGER\n");
                         }
 
         | REAL          {       
-                                $$ = nullptr;
+                                $$ == newexpr_constnum(yylval.real_val);
+                                $$->type = constnum_e; 
                                 fprintf(yyout, "[-] Reduced: const -> REAL\n");
                         }
         
         | STRINGT       {       
-                                $$ = nullptr;
+                                $$ = newexpr_conststring(yylval.string_val);
+                                $$->type = conststring_e;
                                 fprintf(yyout, "[-] Reduced: const -> STRING\n");
                         }
 
         | TRUE          {       
-                                $$ = nullptr;
+                                $$ = newexpr_constbool(true);
+                                $$->type = constbool_e;
+                                $$->boolConst = true;
                                 fprintf(yyout, "[-] Reduced: const -> TRUE\n");
                         }
 
         | FALSE         {       
-                                $$ = nullptr;
+                                $$ = newexpr_constbool(false);
+                                $$->type = constbool_e;
+                                $$->boolConst = false;
                                 fprintf(yyout, "[-] Reduced: const -> FALSE\n");
                         }
 
         | NIL           {
-                                $$ = nullptr;
+                                $$ = newexpr(nil_e);
                                 fprintf(yyout, "[-] Reduced: const -> NIL\n");
                         }
         ;

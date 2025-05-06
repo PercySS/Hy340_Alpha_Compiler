@@ -56,6 +56,7 @@
         "xstddef": "cpp",
         "xtr1common": "cpp",
         "xutility": "cpp"
-    }
+    },
+    "C_Cpp.default.compilerPath": "g++"
     
 }

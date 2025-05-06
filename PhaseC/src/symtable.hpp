@@ -14,6 +14,12 @@
 #include <stack>
 
 typedef enum {
+    programvar,
+    functionlocal,
+    formalarg,
+} ScopeSpace;
+
+typedef enum {
     VAR,
     FUNC,
     LIBFUNC,
@@ -29,6 +35,9 @@ typedef struct SymEntry {
     bool isActive;
     bool isGlobal = false;
     std::vector<SymEntry*> args;
+
+    ScopeSpace space;
+    unsigned offset;
 } SymEntry;
 
 class SymbolTable {
@@ -52,9 +61,23 @@ public:
     void exit_scope();
     
     void printTable(FILE* output) const;
+
+    ScopeSpace currScopeSpace() const;
+    unsigned currScopeOffset() const;
+    void incCurrScopeOffset();
+    void enterScopeSpace();
+    void exitScopeSpace();
+    void resetFormalsOff();
+    void resetFuncLocalsOff();
+    void restoreCurrScopeOffset(unsigned offset);
 private:
     int scope;
     std::vector<std::vector<std::pair<std::string, SymEntry>>> scopes;
+
+    unsigned programVarOffset;
+    unsigned functionLocalOffset;
+    unsigned formalsOffset;
+    unsigned scopeSpaceCtr;
 };
 
 std::string typeToString(SymEntry type);

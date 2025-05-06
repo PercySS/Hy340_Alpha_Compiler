@@ -23,6 +23,11 @@ SymbolTable::SymbolTable() {
         insert(entry);
         delete entry;
     }
+
+    programVarOffset = 0;
+    functionLocalOffset = 0;
+    formalsOffset = 0;
+    scopeSpaceCtr = 1;
 }
 
 SymbolTable::~SymbolTable() {
@@ -36,8 +41,13 @@ int SymbolTable::getScope() const {
 
 void SymbolTable::insert(SymEntry* entry) {
     assert(entry);
-
     assert(entry->scope >= 0 && entry->scope < (int)scopes.size());
+
+    if (entry->type == VAR || entry->type == FORARG) {
+        entry->space = (ScopeSpace) currScopeOffset();
+        entry->offset = (ScopeSpace) currScopeOffset();
+        incCurrScopeOffset();
+    }
 
     scopes[entry->scope].emplace_back(entry->name, *entry);
 }
@@ -120,6 +130,56 @@ void SymbolTable::printTable(FILE* output) const {
     fprintf(output, "\n==================== END OF SYMTABLE =====================\n\n");
 }
 
+ScopeSpace SymbolTable::currScopeSpace() const {
+    if (scopeSpaceCtr == 1) return programvar;
+    else if (scopeSpaceCtr % 2 == 0) return formalarg;
+    else return functionlocal;
+
+}
+
+unsigned SymbolTable::currScopeOffset() const {
+    switch (currScopeSpace()) {
+        case programvar:    return programVarOffset;
+        case functionlocal: return functionLocalOffset;
+        case formalarg:     return formalsOffset;   
+        default:           assert(false); return 0; // unreachable
+    }
+}
+
+void SymbolTable::incCurrScopeOffset() {
+    switch (currScopeSpace()) {
+        case programvar:    programVarOffset++; break;
+        case functionlocal: functionLocalOffset++; break;
+        case formalarg:     formalsOffset++; break;   
+        default:           assert(false); // unreachable
+    }
+}
+
+void SymbolTable::enterScopeSpace() {
+    scopeSpaceCtr++;
+}
+
+void SymbolTable::exitScopeSpace() {
+    assert(scopeSpaceCtr > 1);
+    --scopeSpaceCtr;
+}
+
+void SymbolTable::resetFormalsOff() {
+    formalsOffset = 0;
+}
+
+void SymbolTable::resetFuncLocalsOff() {
+    functionLocalOffset = 0;
+}
+
+void SymbolTable::restoreCurrScopeOffset(unsigned offset) {
+    switch (currScopeSpace()) {
+        case programvar:    programVarOffset = offset; break;
+        case functionlocal: functionLocalOffset = offset; break;
+        case formalarg:     formalsOffset = offset; break;   
+        default:           assert(false); // unreachable
+    }
+}
 
 std::string typeToString(SymEntry entry) {
     switch (entry.type) {
