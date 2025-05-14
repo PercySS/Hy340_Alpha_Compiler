@@ -43,11 +43,11 @@ enum iopcode {
 // ----------- expr node --------------
 struct expr {
     expr_t type;
-    SymEntry* sym = nullptr;
-    expr* index = nullptr;
-    double numConst = 0;
+    SymEntry* sym;
+    expr* index;
+    double numConst;
     std::string strConst;
-    bool boolConst = false;
+    bool boolConst;
     expr* next = nullptr;
 
     std::vector<unsigned> truelist;
@@ -66,13 +66,36 @@ struct quad {
     unsigned line = 0;
 };
 
+struct stmt_t {
+    int breaklist;
+    int contlist;
+};
+
+struct call {
+    expr* elist;
+    std::string name;
+    unsigned char method;
+};
+
+struct indexed {
+    expr* index;
+    expr* value;
+    struct indexed* next;
+};
+
+struct forprefix {
+    int test;
+    int enter;
+};
+
 // ----------- global storage for quads -----------------------
 extern std::vector<quad> quads;
+extern std::stack<std::string> free_temps;
 
 // ----------- helper functions -------------------------
 void emit(iopcode op, expr* arg1, expr* arg2, expr* result);
 unsigned nextquad();
-expr* lvalue_expr(expr* e);
+expr* lvalue_expr(SymEntry* sym);
 expr* newexpr_tmpvar(expr_t type);
 expr* newexpr(expr_t type);
 expr* newexpr_constnum(double val);
@@ -82,10 +105,28 @@ SymEntry* newtemp();
 std::string newtempname();
 void resettemp();
 expr* emit_iftableitem(expr* e);
-void make_call(expr* e, expr* arglist);
+expr* make_call(expr* e, expr* arglist);
+
+expr* member_item(expr* e, std::string name);
+
+bool check_arith(expr* e, std::string context);
+void comperror(const char* msg,const char* context);
+
+unsigned int istempname(const std::string& name);
+unsigned int istempexpr(expr* e);
+
+void make_stmt(stmt_t* stmt);
+int newlist(int i);
+
+int mergelist(int i, int j);
+void patchlist(int list, int label);
+
+expr* convert_to_bool(expr* e);
+void resettemp();
+void release_temp(expr* e);
 
 // ----------- SHORT CIRCUIT --------------
-void backpatch(const std::vector<unsigned>& list, unsigned label);
+void patchlabel(unsigned quadNo, unsigned label);
 std::vector<unsigned> makelist(unsigned quadLabel);
 std::vector<unsigned> merge(const std::vector<unsigned>& list1, const std::vector<unsigned>& list2);
 

@@ -34,6 +34,11 @@ typedef struct SymEntry {
     int line;
     bool isActive;
     bool isGlobal = false;
+    bool isTemp = false;
+
+    unsigned iaddress;
+    unsigned totalLocals;
+
     std::vector<SymEntry*> args;
 
     ScopeSpace space;
@@ -44,9 +49,10 @@ class SymbolTable {
 public:
     SymbolTable();
     ~SymbolTable();
-
+    
     std::vector<std::string> libfuncs; 
     std::stack<SymEntry*> funcStack;
+    std::stack<unsigned> scopeOffsetStack;
 
     int getScope() const;
 
@@ -70,10 +76,10 @@ public:
     void resetFormalsOff();
     void resetFuncLocalsOff();
     void restoreCurrScopeOffset(unsigned offset);
+    unsigned top_pop(std::stack<unsigned>& stack);
 private:
     int scope;
     std::vector<std::vector<std::pair<std::string, SymEntry>>> scopes;
-
     unsigned programVarOffset;
     unsigned functionLocalOffset;
     unsigned formalsOffset;

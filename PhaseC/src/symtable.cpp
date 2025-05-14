@@ -5,6 +5,7 @@ SymbolTable::SymbolTable() {
     scopes = std::vector<std::vector<std::pair<std::string, SymEntry>>>();
     scopes.emplace_back(std::vector<std::pair<std::string, SymEntry>>());
     funcStack = std::stack<SymEntry*>();
+    scopeOffsetStack = std::stack<unsigned>();
 
     libfuncs = {
         "print", "input", "objectmemberkeys", "objecttotalmembers",
@@ -23,6 +24,8 @@ SymbolTable::SymbolTable() {
         insert(entry);
         delete entry;
     }
+
+
 
     programVarOffset = 0;
     functionLocalOffset = 0;
@@ -44,8 +47,8 @@ void SymbolTable::insert(SymEntry* entry) {
     assert(entry->scope >= 0 && entry->scope < (int)scopes.size());
 
     if (entry->type == VAR || entry->type == FORARG) {
-        entry->space = (ScopeSpace) currScopeOffset();
-        entry->offset = (ScopeSpace) currScopeOffset();
+        entry->space = currScopeSpace();
+        entry->offset = currScopeOffset();
         incCurrScopeOffset();
     }
 
@@ -142,21 +145,21 @@ unsigned SymbolTable::currScopeOffset() const {
         case programvar:    return programVarOffset;
         case functionlocal: return functionLocalOffset;
         case formalarg:     return formalsOffset;   
-        default:           assert(false); return 0; // unreachable
+        default:           assert(false); return 0;
     }
 }
 
 void SymbolTable::incCurrScopeOffset() {
     switch (currScopeSpace()) {
-        case programvar:    programVarOffset++; break;
-        case functionlocal: functionLocalOffset++; break;
-        case formalarg:     formalsOffset++; break;   
-        default:           assert(false); // unreachable
+        case programvar:    ++programVarOffset; break;
+        case functionlocal: ++functionLocalOffset; break;
+        case formalarg:     ++formalsOffset; break;   
+        default:           assert(false);
     }
 }
 
 void SymbolTable::enterScopeSpace() {
-    scopeSpaceCtr++;
+    ++scopeSpaceCtr;
 }
 
 void SymbolTable::exitScopeSpace() {
@@ -177,8 +180,17 @@ void SymbolTable::restoreCurrScopeOffset(unsigned offset) {
         case programvar:    programVarOffset = offset; break;
         case functionlocal: functionLocalOffset = offset; break;
         case formalarg:     formalsOffset = offset; break;   
-        default:           assert(false); // unreachable
+        default:           assert(false);
     }
+}
+
+
+
+unsigned SymbolTable::top_pop(std::stack<unsigned>& stack) {
+    assert(!stack.empty());
+    unsigned offset = stack.top();
+    stack.pop();
+    return offset;
 }
 
 std::string typeToString(SymEntry entry) {
@@ -194,6 +206,6 @@ std::string typeToString(SymEntry entry) {
 std::string generateAnonymousName() {
     static int counter = 0;
     std::stringstream ss;
-    ss << "_ANON_" << counter++;
+    ss << "$ANON_" << counter++;
     return ss.str();
 }

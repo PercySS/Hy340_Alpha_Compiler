@@ -1,5 +1,6 @@
 #include "symtable.hpp"
 #include "parser.tab.hpp"
+#include "iopcode.hpp"
 #include <cstdio>
 #include <cstdlib> 
 
@@ -11,7 +12,10 @@ extern int yydebug;
 // Global variables for correct handling of the symbol table
 SymbolTable symTable;
 bool skipBlockScope = false;
-int rabbitHole = 0;
+int loopCounter = 0;
+std::stack<int> loopStack;
+std::stack<std::string> free_temps;
+
 
 int main(int argc, char** argv) {
     // handle the input output according to arguments
@@ -57,6 +61,9 @@ int main(int argc, char** argv) {
 
     // Print the symbol table
     symTable.printTable(output);
+
+    // Print the quads
+    print_quads(output);
 
     // Close the input and output files
     fclose(input);
