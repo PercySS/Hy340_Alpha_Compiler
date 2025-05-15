@@ -138,9 +138,12 @@ expr* make_call(expr* lv, expr* reversed_list) {
     }
 
     emit(call, func, nullptr, nullptr);
+
     expr* result = newexpr(var_e);
     result->sym = newtemp();
-    emit(getretval, nullptr, nullptr, func);
+
+    emit(getretval, nullptr, nullptr, result);
+    
     return result;
 }
 
@@ -197,7 +200,7 @@ void make_stmt(stmt_t* s) {
     s->contlist = 0;
 }
 
-int newlist(int i) {
+int makelist(int i) {
     quads[i].label = 0;
     return i;
 }
@@ -224,42 +227,14 @@ void patchlist(int list, int label) {
 }
 
 
-expr* convert_to_bool(expr* e) {
-    if (e->type == constbool_e) return e;
+void convert_to_bool(expr* e) {
+    if (e->type == boolexpr_e) return;
 
-    if (e->type == constnum_e) {
-        return newexpr_constbool(e->numConst != 0);
-    }
+    e->truelist = makelist(nextquad());
+    emit(if_eq, e, newexpr_constbool(true), nullptr); // Αν true πήγαινε εκεί
 
-    if (e->type == conststring_e) {
-        return newexpr_constbool(!e->strConst.empty());
-    }
-
-    if (e->type == nil_e) {
-        return newexpr_constbool(false);
-    }
-
-    if (e->type == programfunc_e || e->type == libraryfunc_e || e->type == newtable_e) {
-        return newexpr_constbool(true);
-    }
-
-    // Dynamic case
-    expr* result = newexpr(boolexpr_e);
-    result->sym = newtemp();
-
-    // emit: if e == false jump to assign false
-    emit(if_eq, e, newexpr_constbool(false), newexpr_constnum(nextquad() + 3));
-
-    // emit: assign true
-    emit(assign, newexpr_constbool(true), nullptr, result);
-
-    // emit: unconditional jump over false assign
-    emit(jump, nullptr, nullptr, newexpr_constnum(nextquad() + 2));
-
-    // emit: assign false
-    emit(assign, newexpr_constbool(false), nullptr, result);
-
-    return result;
+    e->falselist = makelist(nextquad());
+    emit(jump, nullptr, nullptr, nullptr); // Αλλιώς πήγαινε αλλού
 }
 
 static const char* iopcodeToString(iopcode op) {

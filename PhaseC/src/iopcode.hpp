@@ -116,12 +116,12 @@ unsigned int istempname(const std::string& name);
 unsigned int istempexpr(expr* e);
 
 void make_stmt(stmt_t* stmt);
-int newlist(int i);
 
+int makelist(int i);
 int mergelist(int i, int j);
 void patchlist(int list, int label);
 
-expr* convert_to_bool(expr* e);
+void convert_to_bool(expr* e);
 void resettemp();
 void release_temp(expr* e);
 

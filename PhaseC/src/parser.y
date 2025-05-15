@@ -14,13 +14,13 @@
 
 extern SymbolTable symTable;
 extern bool skipBlockScope;
-extern int loopCounter;
 extern int yylex();
 extern char* yytext;
 extern int yylineno;
 extern FILE *yyin;
 extern FILE *yyout;
-extern std::stack<int> loopStack;
+extern int loopCounter;
+extern std::stack<int> loopCounterStack;
 int yyerror(const char* msg);
 
 // Global variables
@@ -188,10 +188,9 @@ stmt: expr SEMICOLON    {
                                         if (loopCounter == 0) {
                                                 fprintf(yyout, "      [!] Error: Break statement outside of loop in line %d.\n", yylineno);
                                                 $$ = new stmt_t;
-                                                $$->breaklist = 0;
-                                                $$->contlist = 0;
+                                                $$->breaklist = $$->contlist = 0;
                                         } else {
-                                                $$ = new struct stmt_t;
+                                                $$ = new stmt_t;
                                                 $$->contlist = newlist(nextquad());
                                                 $$->breaklist = 0;
                                                 emit(jump, nullptr, nullptr, newexpr_constnum(0));
@@ -204,6 +203,7 @@ stmt: expr SEMICOLON    {
                                         if (loopCounter == 0) {
                                                 fprintf(yyout, "      [!] Error: Continue statement outside of loop in line %d.\n", yylineno);
                                                 $$ = new stmt_t;
+                                                $$->breaklist = $$->contlist = 0;
                                         } else {
                                                 $$ = new stmt_t;
                                                 $$->contlist = newlist(nextquad());
@@ -305,49 +305,63 @@ expr:   assignexpr              {
                                         }      
 
         | expr relop expr             {       
+                                                bool invalid = false;
+
+                                                if ($2 == if_greater || $2 == if_less || $2 == if_greatereq || $2 == if_lesseq) {
+                                                        if ($1->type != constnum_e && $1->type != arith || $3->type != constnum_e && $3->type != arith) {
+                                                                invalid = true;
+                                                        }
+                                                } else if ($2 == if_eq || $2 == if_noteq) {
+                                                        if ($1->type != $3->type) {
+                                                                if (!($1->type == tableitem_e && $3->type == nil_e) || ($1->type == nil_e && $3->type == tableitem_e)) {
+                                                                        invalid = true;
+                                                                }  
+                                                        }
+                                                }
+
+                                                if (invalid) {
+                                                        fprintf(yyout, "      [!] Error: Invalid operands for relational operator in line %d.\n", yylineno);
+                                                        $$ = newexpr(nil_e);
+                                                        return;
+                                                }
+
                                                 $$ = newexpr(boolexpr_e);
                                                 $$->sym = newtemp();
 
                                                 emit($2, $1, $3, newexpr_constnum(nextquad() + 3));
-                                                emit(assign, newexpr_constbool(0), nullptr, $$);
-                                                emit(jump, nullptr, nullptr, newexpr_constnum(extquad() + 2));
-                                                emit(assign, newexpr_constbool(1), nullptr, $$);
-                                                fprintf(yyout, "[-] Reduced: expr -> expr relops expr\n");
+                                                emit(assign, newexpr_constnum(0), nullptr, $$);
+                                                emit(jump, nullptr, nullptr, newexpr_constnum(nextquad() + 2));
+                                                emit(assign, newexpr_constnum(1), nullptr, $$);
+
+                                                fprintf(yyout, "[-] Reduced: expr -> expr relop expr\n");
                                         }
 
-        | expr AND expr                 {       
-                                                expr* left = convert_to_bool($1);
-                                                expr* right = convert_to_bool($3);
+        |expr AND expr          {       
+                                        convert_to_bool($1);
+                                        patch($1->truelist, nextquad());
+                                        
+                                        
+                                        convert_to_bool($3);
+                                        $$ = newexpr(boolexpr_e);
 
-                                                if (left->type == constbool_e && right->type == constbool_e) {
-                                                        $$ = newexpr(constbool_e);
-                                                        $$->boolConst = left->boolConst && right->boolConst;
-                                                } else {
-                                                        $$ = newexpr(boolexpr_e);
-                                                        $$->sym = newtemp();
+                                        $$->truelist = $3->truelist;
+                                        $$->falselist = merge($1->falselist, $3->falselist);
 
-                                                        emit(and_op, left, right, $$);
-                                                }
+                                        fprintf(yyout, "[-] Reduced: expr -> expr AND expr\n");
+                                }
+        
+        | expr OR expr           {       
+                                        convert_to_bool($1);
+                                        patchlist($1->falselist, nextquad());
 
-                                                fprintf(yyout, "[-] Reduced: expr -> expr AND expr\n");
-                                        }
+                                        convert_to_bool($3);
+                                        $$ = newexpr(boolexpr_e);
 
-        | expr OR expr                  {       
-                                                expr* left = convert_to_bool($1);
-                                                expr* right = convert_to_bool($3);
+                                        $$->truelist = merge($1->truelist, $3->truelist);
+                                        $$->falselist = $3->falselist;
 
-                                                if (left->type == constbool_e && right->type == constbool_e) {
-                                                        $$ = newexpr(constbool_e);
-                                                        $$->boolConst = left->boolConst || right->boolConst;
-                                                } else {
-                                                        $$ = newexpr(boolexpr_e);
-                                                        $$->sym = newtemp();
-
-                                                        emit(or_op, left, right, $$);
-                                                }
-
-                                                fprintf(yyout, "[-] Reduced: expr -> expr OR expr\n");
-                                        }
+                                        fprintf(yyout, "[-] Reduced: expr -> expr OR expr\n");
+                                }
 
         | term                          {       
                                                 $$ = $1;
@@ -370,6 +384,7 @@ relop: GREATER_THAN {$$ = if_greater}
         | NOT_EQUAL {$$ = if_noteq}
         ;
 
+
 term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
                                                         $$ = $2;
                                                         fprintf(yyout, "[-] Reduced: term -> LEFT_PARENTHESIS expr RIGHT_PARENTHESIS\n");
@@ -384,10 +399,11 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
                                                 }
 
         | NOT expr                              { 
+                                                        convert_to_bool($2);
+
                                                         $$ = newexpr(boolexpr_e);
-                                                        $$->sym = newtemp();
-                                                        emit(not_op, $2, nullptr, $$);
-                                                        fprintf(yyout, "[-] Reduced: term -> NOT expr\n");
+                                                        $$->truelist = $2->falselist;
+                                                        $$->falselist = $2->truelist;
                                                 }
 
         | INCREMENT lvalue                      {       
@@ -756,14 +772,14 @@ methodcall: DOUBLE_DOT IDENTIFIER LEFT_PARENTHESIS elist RIGHT_PARENTHESIS      
             ;
 
 elist: expr                     {       
-                                        expr *e = $1;
-                                        if (!e) fprintf(yyout, "      [!] Error: elist -> expr is null\n");
-                                        $$ = e;
+                                        $$ = $1;
+                                        $$->next = nullptr;
                                         fprintf(yyout, "[-] Reduced: elist -> expr\n");
                                 }
 
         | elist COMMA expr      {       
-                                        $$ = nullptr;
+                                        $3->next = $1;
+                                        $$ = $3;
                                         fprintf(yyout, "[-] Reduced: elist -> expr COMMA elist\n");
                                 }
 
@@ -832,12 +848,13 @@ block: LEFT_BRACE       {
         ;
 
 funcblockstart: /* ε */ {
-                                
+                                loopCounterStack.push(loopCounter);
+                                loopCounter = 0;
                         }
 
 funcblockend:   /* ε */ {
-                                loopCounter = loopStack.top();
-                                loopStack.pop();
+                                loopCounter = loopCounterStack.top();
+                                loopCounterStack.pop();
                         }
 
 funcname: IDENTIFIER            {       
@@ -910,9 +927,9 @@ funcbody: block {
                         symTable.exitScopeSpace();
                 }
 
-funcdef: funcprefix funcargs funcbody   {
+funcdef: funcprefix funcargs funcblockstart funcbody funcblockend {
                                                 symTable.exitScopeSpace();
-                                                $1->totalLocals = $3;
+                                                $1->totalLocals = $4;
                                                 int offset = symTable.top_pop(symTable.scopeOffsetStack);
                                                 symTable.restoreCurrScopeOffset(offset);
                                                 $$ = $1;
@@ -1032,12 +1049,11 @@ idlist: IDENTIFIER      {
         ;
 
 ifprefix: IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS    {
-                                                                expr* cond = convert_to_bool($3);
+                                                                convert_to_bool($3);
 
-                                                                emit(if_eq, cond, newexpr_constbool(true), newexpr_constnum(nextquad() + 2));
+                                                                patchlist($3->truelist, nextquad());
 
-                                                                $$ = nextquad();
-                                                                emit(jump, nullptr, nullptr, newexpr_constnum(0));
+                                                                $$ = $3->falselist;
                                                         }
 
 elseprefix: ELSE        {
@@ -1047,14 +1063,14 @@ elseprefix: ELSE        {
 
 
 ifstmt: ifprefix stmt %prec LOWER_THAN_ELSE {
-                                patchlabel($1, nextquad()); 
+                                patchlist($1, nextquad());
                                 $$ = nullptr;
                                 fprintf(yyout, "[-] Reduced: ifstmt -> IF (...) stmt\n");
                         }
 
         | ifprefix stmt elseprefix stmt {
-                                                patchlabel($1, $3 + 1);
-                                                patchlabel($3, nextquad());
+                                                patchlist($1, $3 + 1);
+                                                patchlist($3, nextquad());
                                                 $$ = nullptr; 
                                                 fprintf(yyout, "[-] Reduced: ifstmt -> IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt ELSE stmt\n");
                                         }
@@ -1076,23 +1092,17 @@ whilestart: WHILE       {
                         }
 
 whilecond: LEFT_PARENTHESIS expr RIGHT_PARENTHESIS      {
-                                                                expr* cond = convert_to_bool($2);
-
-                                                                emit(if_eq, cond, newexpr_constbool(true), newexpr_constnum(nextquad() + 2));
-
-                                                                $$ = nextquad();
-                                                                emit(jump, nullptr, nullptr, newexpr_constnum(0));
+                                                                expr* e = convert_to_bool($2);
+                                                                patchlist(e->truelist, nextquad());
+                                                                $$ = e->falselist;
                                                         }
 
 whilestmt: whilestart whilecond loopstmt    {
-                                                emit(jump, nullptr, nullptr, newexpr_constnum($2));
-                                                
-                                                patchlabel($1, nextquad());
+                                                emit(jump, nullptr, nullptr, newexpr_constnum($1));
 
-
+                                                patchlist($2, nextquad());
                                                 patchlist($3->breaklist, nextquad());
                                                 patchlist($3->contlist, $1);
-
                                                 $$ = nullptr;
 
                                                 fprintf(yyout, "[-] Reduced: whilestmt -> WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt\n");
@@ -1110,13 +1120,13 @@ M :     {
         }
 ;
 
-forprefix: FOR LEFT_PARENTHESIS  elist SEMICOLON expr SEMICOLON {       
+forprefix: FOR LEFT_PARENTHESIS  elist SEMICOLON M expr SEMICOLON {       
                                                                         $$ = new struct forprefix;
-                                                                        $$->test = nextquad();
+                                                                        $$->test = $5;
 
-                                                                        expr* cond = convert_to_bool($5);
-                                                                        emit(if_eq, cond, newexpr_constbool(true), newexpr_constnum(0));
-
+                                                                        expr* e = convert_to_bool($6);
+                                                                        patchlist(e->truelist, nextquad());
+                                                                        
                                                                         $$->enter = nextquad();
                                                                         emit(jump, nullptr, nullptr, newexpr_constnum(0));
                                                                 }
@@ -1124,32 +1134,43 @@ forprefix: FOR LEFT_PARENTHESIS  elist SEMICOLON expr SEMICOLON {
                                                                 
 
 forstmt: forprefix N elist RIGHT_PARENTHESIS N loopstmt M   {
-                                                               emit(jump, nullptr, nullptr, newexpr_constnum($1->test));
-                                                               
-                                                                patchlabel($1->enter, $5 + 1);
-                                                                patchlabel($2, nextquad());
-                                                                patchlabel($5, $1->test);
-                                                                patchlabel($7, $5 + 1);
+                                                                emit(jump, nullptr, nullptr, newexpr_constnum($1->test));
 
                                                                 patchlist($6->breaklist, nextquad());
                                                                 patchlist($6->contlist, $1->test);
 
+                                                                patchlist($6->breaklist, nextquad());
+                                                                patchlist($1->enter, $5 + 1);
+                                                                patchlist($2, nextquad());
+                                                                patchlist($5, $1->test);
+                                                                patchlist($7, $2 + 1);
+
                                                                 $$ = new stmt_t;
                                                                 $$->breaklist = $6->breaklist;
                                                                 $$->contlist = $6->contlist;
+
                                                                 fprintf(yyout, "[-] Reduced: forstmt -> FOR LEFT_PARENTHESIS elist SEMICOLON expr SEMICOLON N elist RIGHT_PARENTHESIS N stmt M\n");
                                                         }
         ;
 
-returnstmt: RETURN expr SEMICOLON       {
-                                                emit(getretval, nullptr, nullptr, $2);
+returnstmt: RETURN expr SEMICOLON       {       
+                                                if (symTable.funcStack.empty()) {
+                                                        fprintf(yyout, "      [!] Error: Return statement outside function in line %d.\n", yylineno);
+                                                } else {
+                                                        emit(getretval, nullptr, nullptr, $2);
+                                                }
                                                 $$ = new stmt_t;
                                                 $$->breaklist = 0;
                                                 $$->contlist = 0;
                                                 fprintf(yyout, "[-] Reduced: returnstmt -> RETURN expr SEMICOLON\n");
                                         }
             | RETURN SEMICOLON          {       
-                                                emit(getretval, nullptr, nullptr, nullptr);
+                                                if (symTable.funcStack.empty()) {
+                                                        fprintf(yyout, "      [!] Error: Return statement outside function in line %d.\n", yylineno);
+                                                } else {
+                                                        emit(getretval, nullptr, nullptr, newexpr(nil_e));
+                                                }
+
                                                 $$ = new stmt_t;
                                                 $$->breaklist = 0;
                                                 $$->contlist = 0;
