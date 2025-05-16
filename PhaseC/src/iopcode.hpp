@@ -44,7 +44,7 @@ enum iopcode {
 struct expr {
     expr_t type;
     SymEntry* sym;
-    expr* index;
+    struct expr* index;
     double numConst;
     std::string strConst;
     bool boolConst;
@@ -88,12 +88,12 @@ struct forprefix {
     int enter;
 };
 
-// ----------- global storage for quads -----------------------
+// ----------- global storage for quads -----------------
 extern std::vector<quad> quads;
 extern std::stack<std::string> free_temps;
 
 // ----------- helper functions -------------------------
-void emit(iopcode op, expr* arg1, expr* arg2, expr* result);
+void emit(iopcode op, expr* arg1, expr* arg2, expr* result, unsigned label);
 unsigned nextquad();
 expr* lvalue_expr(SymEntry* sym);
 expr* newexpr_tmpvar(expr_t type);
@@ -117,20 +117,18 @@ unsigned int istempexpr(expr* e);
 
 void make_stmt(stmt_t* stmt);
 
-int makelist(int i);
+int newlist(int i);
 int mergelist(int i, int j);
 void patchlist(int list, int label);
 
-void convert_to_bool(expr* e);
+expr* convert_to_bool(expr* e);
 void resettemp();
 void release_temp(expr* e);
 
 // ----------- SHORT CIRCUIT --------------
 void patchlabel(unsigned quadNo, unsigned label);
-std::vector<unsigned> makelist(unsigned quadLabel);
-std::vector<unsigned> merge(const std::vector<unsigned>& list1, const std::vector<unsigned>& list2);
 
 
-// ----------------- printing functions ------------------
+// ----------------- printing functions -----------------
 void print_quads(FILE* output);
 #endif // __ICODE_HPP__

@@ -225,8 +225,8 @@ MACLN       [\r]
     
     /* Constants */
 {Digit}+                        {   
-                                    fprintf(yyout, "[+] Shift token integer: %s\n", yytext);
                                     yylval.int_val = atoi(yytext);
+                                    fprintf(yyout, "[+] Shift token integer: %s\n", yytext);
                                     return INTEGER;
                                 }
 

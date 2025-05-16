@@ -68,45 +68,45 @@ extern int yydebug;
     INCREMENT = 269,               /* INCREMENT  */
     DECREMENT = 270,               /* DECREMENT  */
     ASSIGN = 271,                  /* ASSIGN  */
-    PLUS_ASSIGN = 272,             /* PLUS_ASSIGN  */
-    MINUS_ASSIGN = 273,            /* MINUS_ASSIGN  */
-    SEMICOLON = 274,               /* SEMICOLON  */
-    COMMA = 275,                   /* COMMA  */
-    COLON = 276,                   /* COLON  */
-    DOUBLE_COLON = 277,            /* DOUBLE_COLON  */
-    DOT = 278,                     /* DOT  */
-    DOUBLE_DOT = 279,              /* DOUBLE_DOT  */
-    LEFT_PARENTHESIS = 280,        /* LEFT_PARENTHESIS  */
-    RIGHT_PARENTHESIS = 281,       /* RIGHT_PARENTHESIS  */
-    LEFT_BRACE = 282,              /* LEFT_BRACE  */
-    RIGHT_BRACE = 283,             /* RIGHT_BRACE  */
-    LEFT_BRACKET = 284,            /* LEFT_BRACKET  */
-    RIGHT_BRACKET = 285,           /* RIGHT_BRACKET  */
-    UMINUS = 286,                  /* UMINUS  */
-    IF = 287,                      /* IF  */
-    ELSE = 288,                    /* ELSE  */
-    WHILE = 289,                   /* WHILE  */
-    FOR = 290,                     /* FOR  */
-    FUNCTION = 291,                /* FUNCTION  */
-    RETURN = 292,                  /* RETURN  */
-    BREAK = 293,                   /* BREAK  */
-    CONTINUE = 294,                /* CONTINUE  */
-    TRUE = 295,                    /* TRUE  */
-    FALSE = 296,                   /* FALSE  */
-    NIL = 297,                     /* NIL  */
-    LOCAL = 298,                   /* LOCAL  */
-    AND = 299,                     /* AND  */
-    NOT = 300,                     /* NOT  */
-    OR = 301,                      /* OR  */
-    INTEGER = 302,                 /* INTEGER  */
-    REAL = 303,                    /* REAL  */
-    STRINGT = 304,                 /* STRINGT  */
-    IDENTIFIER = 305,              /* IDENTIFIER  */
-    ERROR_COMMENT = 306,           /* ERROR_COMMENT  */
-    ERROR_STRING = 307,            /* ERROR_STRING  */
-    ERROR_ESCAPE = 308,            /* ERROR_ESCAPE  */
-    UNDEF = 309,                   /* UNDEF  */
-    LOWER_THAN_ELSE = 310          /* LOWER_THAN_ELSE  */
+    SEMICOLON = 272,               /* SEMICOLON  */
+    COMMA = 273,                   /* COMMA  */
+    COLON = 274,                   /* COLON  */
+    DOUBLE_COLON = 275,            /* DOUBLE_COLON  */
+    DOT = 276,                     /* DOT  */
+    DOUBLE_DOT = 277,              /* DOUBLE_DOT  */
+    LEFT_PARENTHESIS = 278,        /* LEFT_PARENTHESIS  */
+    RIGHT_PARENTHESIS = 279,       /* RIGHT_PARENTHESIS  */
+    LEFT_BRACE = 280,              /* LEFT_BRACE  */
+    RIGHT_BRACE = 281,             /* RIGHT_BRACE  */
+    LEFT_BRACKET = 282,            /* LEFT_BRACKET  */
+    RIGHT_BRACKET = 283,           /* RIGHT_BRACKET  */
+    UMINUS = 284,                  /* UMINUS  */
+    IF = 285,                      /* IF  */
+    ELSE = 286,                    /* ELSE  */
+    WHILE = 287,                   /* WHILE  */
+    FOR = 288,                     /* FOR  */
+    FUNCTION = 289,                /* FUNCTION  */
+    RETURN = 290,                  /* RETURN  */
+    BREAK = 291,                   /* BREAK  */
+    CONTINUE = 292,                /* CONTINUE  */
+    TRUE = 293,                    /* TRUE  */
+    FALSE = 294,                   /* FALSE  */
+    NIL = 295,                     /* NIL  */
+    LOCAL = 296,                   /* LOCAL  */
+    AND = 297,                     /* AND  */
+    NOT = 298,                     /* NOT  */
+    OR = 299,                      /* OR  */
+    INTEGER = 300,                 /* INTEGER  */
+    REAL = 301,                    /* REAL  */
+    STRINGT = 302,                 /* STRINGT  */
+    IDENTIFIER = 303,              /* IDENTIFIER  */
+    ERROR_COMMENT = 304,           /* ERROR_COMMENT  */
+    ERROR_STRING = 305,            /* ERROR_STRING  */
+    ERROR_ESCAPE = 306,            /* ERROR_ESCAPE  */
+    UNDEF = 307,                   /* UNDEF  */
+    LOWER_THAN_ELSE = 308,         /* LOWER_THAN_ELSE  */
+    PLUS_ASSIGN = 309,             /* PLUS_ASSIGN  */
+    MINUS_ASSIGN = 310             /* MINUS_ASSIGN  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -125,9 +125,10 @@ union YYSTYPE
         struct call *callval;
         struct indexed *indexed;
         struct stmt_t *stmtval;
+        unsigned offset;
         struct forprefix *forprefix;
 
-#line 131 "out/parser.tab.hpp"
+#line 132 "out/parser.tab.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

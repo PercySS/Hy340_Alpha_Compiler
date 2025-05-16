@@ -39,6 +39,7 @@ SymEntry* entryFuncDef = nullptr;
         struct call *callval;
         struct indexed *indexed;
         struct stmt_t *stmtval;
+        unsigned offset;
         struct forprefix *forprefix;
 }
 
@@ -60,8 +61,6 @@ SymEntry* entryFuncDef = nullptr;
 
 /* ASSIGN */
 %token ASSIGN
-%token PLUS_ASSIGN
-%token MINUS_ASSIGN
 
 
 /* Delimeters */
@@ -115,13 +114,12 @@ SymEntry* entryFuncDef = nullptr;
 %type <expr>    assignexpr elist member idlist errors const
 %type <node>    funcprefix funcdef
   
-%type <stmtval> block stmt stmt_list ifstmt whilestmt forstmt loopstmt program returnstmt
+%type <stmtval> block stmt stmt_list ifstmt whilestmt forstmt loopstmt returnstmt break continue 
 
 %type <callval> callsuffix normcall methodcall 
 %type <indexed> indexed indexedelem   
 %type <str_val> funcname
-%type<int_val> funcbody arithop relop
-%type <int_val> ifprefix elseprefix N M
+%type <offset> ifprefix elseprefix N M funcbody
 %type <forprefix> forprefix
 %type <int_val> whilestart whilecond loopstart loopend
 
@@ -138,11 +136,12 @@ SymEntry* entryFuncDef = nullptr;
 %nonassoc GREATER_THAN GREATER_THAN_EQUAL LESS_THAN LESS_THAN_EQUAL
 %left PLUS MINUS
 %left MULTIPLY DIVIDE MODULO
-%right NOT INCREMENT DECREMENT UMINUS
+%right NOT INCREMENT DECREMENT
+%nonassoc UMINUS
 %left DOT DOUBLE_DOT
 %left LEFT_BRACKET RIGHT_BRACKET
 %left LEFT_PARENTHESIS RIGHT_PARENTHESIS  
-%left LEFT_BRACE RIGHT_BRACE
+%left RIGHT_BRACE LEFT_BRACE 
 
 
 %%
@@ -153,8 +152,7 @@ program: stmt_list      {
 
 stmt: expr SEMICOLON    {       
                                 $$ = new stmt_t;
-                                $$->breaklist = 0;
-                                $$->contlist = 0; 
+                                make_stmt($$);
                                 resettemp();
                                 fprintf(yyout, "[-] Reduced: stmt -> expr SEMICOLON\n");
                         }
@@ -177,42 +175,22 @@ stmt: expr SEMICOLON    {
                                 fprintf(yyout, "[-] Reduced: stmt -> forstmt\n");
                         }
 
-        | returnstmt    {
+        | returnstmt    {       
                                 if (symTable.funcStack.empty()) fprintf(yyout, "      [!] Error: Return statement outside of function in line %d.\n", yylineno);
                                 $$ = $1;
                                 resettemp();
                                 fprintf(yyout, "[-] Reduced: stmt -> returnstmt\n");
                         }
 
-        | BREAK SEMICOLON       {       
-                                        if (loopCounter == 0) {
-                                                fprintf(yyout, "      [!] Error: Break statement outside of loop in line %d.\n", yylineno);
-                                                $$ = new stmt_t;
-                                                $$->breaklist = $$->contlist = 0;
-                                        } else {
-                                                $$ = new stmt_t;
-                                                $$->contlist = newlist(nextquad());
-                                                $$->breaklist = 0;
-                                                emit(jump, nullptr, nullptr, newexpr_constnum(0));
-                                        }
-                                        resettemp();
-                                        fprintf(yyout, "[-] Reduced: stmt -> BREAK SEMICOLON\n");
-                                }
+        | continue      {
+                                resettemp();
+                                fprintf(yyout, "[-] Reduced: stmt -> BREAK SEMICOLON\n");
+                        }
 
-        | CONTINUE SEMICOLON    {       
-                                        if (loopCounter == 0) {
-                                                fprintf(yyout, "      [!] Error: Continue statement outside of loop in line %d.\n", yylineno);
-                                                $$ = new stmt_t;
-                                                $$->breaklist = $$->contlist = 0;
-                                        } else {
-                                                $$ = new stmt_t;
-                                                $$->contlist = newlist(nextquad());
-                                                $$->breaklist = 0;
-                                                emit(jump, nullptr, nullptr, newexpr_constnum(0));
-                                        }
-                                        resettemp();
-                                        fprintf(yyout, "[-] Reduced: stmt -> CONTINUE SEMICOLON\n");
-                                }
+        | break    {       
+                        resettemp();
+                        fprintf(yyout, "[-] Reduced: stmt -> CONTINUE SEMICOLON\n");
+                }
 
         | block                 {       
                                         $$ = $1;
@@ -222,8 +200,7 @@ stmt: expr SEMICOLON    {
 
         | funcdef               {
                                         $$ = new stmt_t;
-                                        $$->breaklist = 0;
-                                        $$->contlist = 0;
+                                        make_stmt($$);
                                         resettemp();
                                         fprintf(yyout, "[-] Reduced: stmt -> funcdef\n");
                                 }
@@ -235,8 +212,7 @@ stmt: expr SEMICOLON    {
 
         | errors                {
                                         $$ = new stmt_t;
-                                        $$->breaklist = 0;
-                                        $$->contlist = 0;
+                                        make_stmt($$);
                                         resettemp();
                                         fprintf(yyout, "[-] Reduced: stmt -> errors\n");
                                 }
@@ -250,115 +226,264 @@ stmt: expr SEMICOLON    {
                                 }
         
         ;
-    
-stmt_list:  stmt stmt_list      {
-                                        $$ = new stmt_t;
-                                        $$->breaklist = mergelist($1->breaklist, $2->breaklist);
-                                        $$->contlist = mergelist($1->contlist, $2->contlist);
-                                        fprintf(yyout, "[-] Reduced: stmt_list -> stmt stmt_list\n");
+
+stmt_list:      stmt stmt_list  {       
+                                        if (!$1 && !$2) {
+                                                $$ = nullptr;
+                                        } else if ($1 && !$2) {
+                                                $$ = $1;
+                                        } else if (!$1 && $2) {
+                                                $$ = $2;
+                                        }
+                                        fprintf(yyout, "[-] Reduced: stmt_list -> stmt\n");
                                 }
 
-            | /* empty */       {       
-                                        $$ = new stmt_t;
-                                        $$->breaklist = 0;
-                                        $$->contlist = 0;
-
-                                        fprintf(yyout, "[-] Reduced: stmt_list -> /* empty */\n");
+                |               {     
+                                                $$ = nullptr;
+                                                fprintf(yyout, "[-] Reduced: stmt_list -> stmt_list stmt\n");
                                 }
-            ;
 
 expr:   assignexpr              {       
                                         $$ = $1;
                                         fprintf(yyout, "[-] Reduced: expr -> assignexpr\n");
                                 }
 
-        | expr arithop expr             {       
-                                                if (!(check_arith($1, "expr arithop expr") || !check_arith($3, "expr arithop expr"))) {
+        | expr PLUS expr                {       
+                                                if (!(check_arith($1, "expr PLUS expr") || !check_arith($3, "expr PLUS expr"))) {
                                                         $$ = newexpr(nil_e);
                                                         fprintf(yyout, "      [!] Error: Invalid expression in line %d.\n", yylineno);
-                                                        return;
-                                                } 
-                                                 
-                                                if ($1->type == constnum_e && $3->type == constnum_e) {
-                                                        $$ = newexpr(constnum_e);
-                                                        switch ($2) {
-                                                                case add: $$->numConst = $1->numConst + $3->numConst; break;
-                                                                case sub: $$->numConst = $1->numConst - $3->numConst; break;
-                                                                case mul: $$->numConst = $1->numConst * $3->numConst; break;
-                                                                case div_op: if ($3->numConst == 0) goto fallback_nil; else $$->numConst = $1->numConst / $3->numConst; break;
-                                                                case mod: if ($3->numConst == 0) goto fallback_nil; else $$->numConst = fmod($1->numConst, $3->numConst); break;        
-                                                        }
-
-
                                                 } else {
                                                         $$ = newexpr(arithexpr_e);
                                                         $$->sym = newtemp();
-                                                        emit($2, $1, $3, $$);
+                                                        if ($1->type == constnum_e && $3->type == constnum_e) $$->numConst = $1->numConst + $3->numConst;
+                                                        
+                                                        emit(add, $1, $3, $$, 0);
                                                 }
 
-                                                fprintf(yyout, "[-] Reduced: expr -> expr arithop expr\n");
-                                                return;
-
-                                                fallback_nil:
-                                                        fprintf(yyout, "      [!] Error: Division by zero in line %d.\n", yylineno);
-                                                        $$ = newexpr(nil_e);
-                                        }      
-
-        | expr relop expr             {       
-                                                bool invalid = false;
-
-                                                if ($2 == if_greater || $2 == if_less || $2 == if_greatereq || $2 == if_lesseq) {
-                                                        if ($1->type != constnum_e && $1->type != arith || $3->type != constnum_e && $3->type != arith) {
-                                                                invalid = true;
-                                                        }
-                                                } else if ($2 == if_eq || $2 == if_noteq) {
-                                                        if ($1->type != $3->type) {
-                                                                if (!($1->type == tableitem_e && $3->type == nil_e) || ($1->type == nil_e && $3->type == tableitem_e)) {
-                                                                        invalid = true;
-                                                                }  
-                                                        }
-                                                }
-
-                                                if (invalid) {
-                                                        fprintf(yyout, "      [!] Error: Invalid operands for relational operator in line %d.\n", yylineno);
-                                                        $$ = newexpr(nil_e);
-                                                        return;
-                                                }
-
-                                                $$ = newexpr(boolexpr_e);
-                                                $$->sym = newtemp();
-
-                                                emit($2, $1, $3, newexpr_constnum(nextquad() + 3));
-                                                emit(assign, newexpr_constnum(0), nullptr, $$);
-                                                emit(jump, nullptr, nullptr, newexpr_constnum(nextquad() + 2));
-                                                emit(assign, newexpr_constnum(1), nullptr, $$);
-
-                                                fprintf(yyout, "[-] Reduced: expr -> expr relop expr\n");
+                                                fprintf(yyout, "[-] Reduced: expr -> expr PLUS expr\n");
                                         }
 
-        |expr AND expr          {       
-                                        convert_to_bool($1);
-                                        patch($1->truelist, nextquad());
-                                        
-                                        
-                                        convert_to_bool($3);
-                                        $$ = newexpr(boolexpr_e);
+        | expr MINUS expr               {       
+                                                if (!(check_arith($1, "expr MINUS expr") || !check_arith($3, "expr MINUS expr"))) {
+                                                        $$ = newexpr(nil_e);
+                                                        fprintf(yyout, "      [!] Error: Invalid expression in line %d.\n", yylineno);
+                                                } else {
+                                                        $$ = newexpr(arithexpr_e);
+                                                        $$->sym = newtemp();
+                                                        if ($1->type == constnum_e && $3->type == constnum_e) $$->numConst = $1->numConst - $3->numConst;
+                                                        emit(sub, $1, $3, $$, 0);
+                                                }
 
-                                        $$->truelist = $3->truelist;
-                                        $$->falselist = merge($1->falselist, $3->falselist);
+                                                fprintf(yyout, "[-] Reduced: expr -> expr MINUS expr\n");
+                                        }
+
+        | expr MULTIPLY expr            {       
+                                                if (!(check_arith($1, "expr MULTIPLY expr") || !check_arith($3, "expr MULTIPLY expr"))) {
+                                                        $$ = newexpr(nil_e);
+                                                        fprintf(yyout, "      [!] Error: Invalid expression in line %d.\n", yylineno);
+                                                } else {
+                                                        $$ = newexpr(arithexpr_e);
+                                                        $$->sym = newtemp();
+                                                        if ($1->type == constnum_e && $3->type == constnum_e) $$->numConst = $1->numConst * $3->numConst;
+                                                        emit(mul, $1, $3, $$, 0);
+                                                }
+
+                                                fprintf(yyout, "[-] Reduced: expr -> expr MULTIPLY expr\n");
+                                        }
+                                
+        | expr DIVIDE expr              {       
+                                                if (!(check_arith($1, "expr DIVIDE expr") || !check_arith($3, "expr DIVIDE expr"))) {
+                                                        $$ = newexpr(nil_e);
+                                                        fprintf(yyout, "      [!] Error: Invalid expression in line %d.\n", yylineno);
+                                                } else if ($1->type == constnum_e && $3->type == constnum_e) {
+                                                        if ($3->numConst == 0) {
+                                                               fprintf(yyout, "      [!] Error: Division by zero in line %d.\n", yylineno);
+                                                                $$ = newexpr(nil_e); 
+                                                        } else {
+                                                                $$ = newexpr(arithexpr_e);
+                                                                $$->sym = newtemp();
+                                                                $$->numConst = $1->numConst / $3->numConst;
+                                                                emit(div_op, $1, $3, $$, 0);
+                                                        }
+                                                } else {
+                                                        $$ = newexpr(arithexpr_e);
+                                                        $$->sym = newtemp();
+                                                        emit(div_op, $1, $3, $$, 0);
+                                                }
+
+                                                fprintf(yyout, "[-] Reduced: expr -> expr DIVIDE expr\n");
+                                        }
+
+        | expr MODULO expr              {       
+                                                if ((!check_arith($1, "expr MODULO expr") || !check_arith($3, "expr MODULO expr"))) {
+                                                        $$ = newexpr(nil_e);
+                                                        fprintf(yyout, "      [!] Error: Invalid expression in line %d.\n", yylineno);
+                                                } else if ($1->type == constnum_e && $3->type == constnum_e) {
+                                                        if ($3->numConst == 0){
+                                                                fprintf(yyout, "      [!] Error: Division by zero in line %d.\n", yylineno);
+                                                                $$ = newexpr(nil_e);
+                                                        } else {
+                                                                $$ = newexpr(arithexpr_e);
+                                                                $$->sym = newtemp();
+                                                                $$->numConst = (int) $1->numConst % (int) $3->numConst;
+                                                                emit(mod, $1, $3, $$, 0);
+                                                        }
+                                                } else {
+                                                        $$ = newexpr(arithexpr_e);
+                                                        $$->sym = newtemp();
+                                                        emit(mod, $1, $3, $$, 0);
+                                                }
+
+                                                fprintf(yyout, "[-] Reduced: expr -> expr MODULO expr\n");
+                                        }
+
+        | expr LESS_THAN expr           {
+                                                if (!check_arith($1, "expr LESS_THAN expr") || !check_arith($3, "expr LESS_THAN expr")) {
+                                                        fprintf(yyout, "      [!] Error: Invalid expression in line %d.\n", yylineno);
+                                                        $$ = newexpr(nil_e);
+                                                } else {
+                                                        $$ = newexpr(boolexpr_e);
+                                                        $$->sym = newtemp();
+                                                        $$->boolConst = $1->numConst < $3->numConst;
+                                                        emit(if_less, $1, $3, nullptr, (nextquad() + 3));
+                                                        emit(assign, newexpr_constbool(false), nullptr, $$, 0);
+                                                        emit(jump, nullptr, nullptr, nullptr, (nextquad() + 2));
+                                                        emit(assign, newexpr_constbool(true), nullptr, $$, 0);
+                                                }                                                
+
+                                                fprintf(yyout, "[-] Reduced: expr -> expr LESS_THAN expr\n");
+        }
+
+        | expr GREATER_THAN expr        {
+                                                if (!check_arith($1, "expr GREATER_THAN expr") || !check_arith($3, "expr GREATER_THAN expr")) {
+                                                        fprintf(yyout, "      [!] Error: Invalid expression in line %d.\n", yylineno);
+                                                        $$ = newexpr(nil_e);
+                                                } else {
+                                                        $$ = newexpr(boolexpr_e);
+                                                        $$->sym = newtemp();
+                                                        $$->boolConst = $1->numConst > $3->numConst;
+                                                        emit(if_greater, $1, $3, nullptr, (nextquad() + 3));
+                                                        emit(assign, newexpr_constbool(false), nullptr, $$, 0);
+                                                        emit(jump, nullptr, nullptr, nullptr, (nextquad() + 2));
+                                                        emit(assign, newexpr_constbool(true), nullptr, $$, 0);
+                                                }
+
+                                                fprintf(yyout, "[-] Reduced: expr -> expr GREATER_THAN expr\n");
+        }
+
+        | expr GREATER_THAN_EQUAL expr   {
+                                                if (!check_arith($1, "expr GREATER_THAN_EQUAL expr") || !check_arith($3, "expr GREATER_THAN_EQUAL expr")) {
+                                                        fprintf(yyout, "      [!] Error: Invalid expression in line %d.\n", yylineno);
+                                                        $$ = newexpr(nil_e);
+                                                } else {
+                                                        $$ = newexpr(boolexpr_e);
+                                                        $$->sym = newtemp();
+                                                        emit(if_greatereq, $1, $3, nullptr, (nextquad() + 3));
+                                                        emit(assign, newexpr_constbool(false), nullptr, $$, 0);
+                                                        emit(jump, nullptr, nullptr, nullptr, (nextquad() + 2));
+                                                        emit(assign, newexpr_constbool(true), nullptr, $$, 0);
+                                                }
+
+                                                fprintf(yyout, "[-] Reduced: expr -> expr GREATER_THAN_EQUAL expr\n");
+        }
+
+        | expr LESS_THAN_EQUAL expr    {
+                                                if (!check_arith($1, "expr LESS_THAN_EQUAL expr") || !check_arith($3, "expr LESS_THAN_EQUAL expr")) {
+                                                        fprintf(yyout, "      [!] Error: Invalid expression in line %d.\n", yylineno);
+                                                        $$ = newexpr(nil_e);
+                                                } else {
+                                                        $$ = newexpr(boolexpr_e);
+                                                        $$->sym = newtemp();
+                                                        emit(if_lesseq, $1, $3, nullptr, (nextquad() + 3));
+                                                        emit(assign, newexpr_constbool(false), nullptr, $$, 0);
+                                                        emit(jump, nullptr, nullptr, nullptr, (nextquad() + 2));
+                                                        emit(assign, newexpr_constbool(true), nullptr, $$, 0);
+                                                }
+
+                                                fprintf(yyout, "[-] Reduced: expr -> expr LESS_THAN_EQUAL expr\n");
+        }
+
+        | expr EQUAL expr           {       
+                                        if ($1->type == $3->type && $1->type != nil_e) {
+                                                $$ = newexpr(boolexpr_e);
+                                                $$->sym = newtemp();
+                                                emit(if_eq, $1, $3, nullptr, (nextquad() + 3));
+                                                emit(assign, newexpr_constbool(false), nullptr, $$, 0);
+                                                emit(jump, nullptr, nullptr, nullptr, (nextquad() + 2));
+                                                emit(assign, newexpr_constbool(true), nullptr, $$, 0);
+                                        } else if ($1->type == newtable_e && $3->type == nil_e) {
+                                                $$ = newexpr(boolexpr_e);
+                                                $$->sym = newtemp();
+                                                emit(if_eq, $1, $3, nullptr, (nextquad() + 3));
+                                                emit(assign, newexpr_constbool(true), nullptr, $$, 0);
+                                                emit(jump, nullptr, nullptr, nullptr, (nextquad() + 2));
+                                                emit(assign, newexpr_constbool(false), nullptr, $$, 0);                                                
+                                        } else if ($3->type == newtable_e && $1->type == nil_e) {
+                                                $$ = newexpr(boolexpr_e);
+                                                $$->sym = newtemp();
+                                                emit(if_eq, $1, $3, nullptr, (nextquad() + 3));
+                                                emit(assign, newexpr_constbool(true), nullptr, $$, 0);
+                                                emit(jump, nullptr, nullptr, nullptr, (nextquad() + 2));
+                                                emit(assign, newexpr_constbool(false), nullptr, $$, 0);                                                
+                                        } else {
+                                                if (!($1->type == tableitem_e && $3->type == nil_e) || ($1->type == nil_e && $3->type == tableitem_e)) {
+                                                        fprintf(yyout, "      [!] Error: Invalid operands for equality operator in line %d.\n", yylineno);
+                                                        $$ = newexpr(nil_e);
+                                                }
+                                        }
+
+
+                                        fprintf(yyout, "[-] Reduced: expr -> expr EQUAL expr\n");
+                                }
+
+        | expr NOT_EQUAL expr        {       
+                                        if ($1->type == $3->type && $1->type != nil_e) {
+                                                $$ = newexpr(boolexpr_e);
+                                                $$->sym = newtemp();
+                                                emit(if_noteq, $1, $3, nullptr, (nextquad() + 3));
+                                                emit(assign, newexpr_constbool(false), nullptr, $$, 0);
+                                                emit(jump, nullptr, nullptr, nullptr, (nextquad() + 2));
+                                                emit(assign, newexpr_constbool(true), nullptr, $$, 0);
+                                        } else if ($1->type == newtable_e && $3->type == nil_e) {
+                                                $$ = newexpr(boolexpr_e);
+                                                $$->sym = newtemp();
+                                                emit(if_noteq, $1, $3, nullptr, (nextquad() + 3));
+                                                emit(assign, newexpr_constbool(true), nullptr, $$, 0);
+                                                emit(jump, nullptr, nullptr, nullptr, (nextquad() + 2));
+                                                emit(assign, newexpr_constbool(false), nullptr, $$, 0);       
+                                        } else if ($1->type == nil_e && $3->type == newtable_e) {
+                                                $$ = newexpr(boolexpr_e);
+                                                $$->sym = newtemp();
+                                                emit(if_noteq, $1, $3, nullptr, (nextquad() + 3));
+                                                emit(assign, newexpr_constbool(true), nullptr, $$, 0);
+                                                emit(jump, nullptr, nullptr, nullptr, (nextquad() + 2));
+                                                emit(assign, newexpr_constbool(false), nullptr, $$, 0);       
+                                        } else {
+                                                fprintf(yyout, "      [!] Error: Invalid operands for equality operator in line %d.\n", yylineno);
+                                                $$ = newexpr(nil_e);
+                                        }
+
+                                        fprintf(yyout, "[-] Reduced: expr -> expr NOT_EQUAL expr\n");
+                                }                                        
+
+        |expr AND expr          {       
+                                        expr* temp1 = convert_to_bool($1);
+                                        expr* temp2 = convert_to_bool($3);
+                                        
+                                        $$ = newexpr(boolexpr_e);
+                                        $$->sym = newtemp();
+                                        emit(and_op, temp1, temp2, $$, 0);
 
                                         fprintf(yyout, "[-] Reduced: expr -> expr AND expr\n");
                                 }
         
         | expr OR expr           {       
-                                        convert_to_bool($1);
-                                        patchlist($1->falselist, nextquad());
+                                        expr* temp1 = convert_to_bool($1);
+                                        expr* temp2 = convert_to_bool($3);
 
-                                        convert_to_bool($3);
                                         $$ = newexpr(boolexpr_e);
-
-                                        $$->truelist = merge($1->truelist, $3->truelist);
-                                        $$->falselist = $3->falselist;
+                                        $$->sym = newtemp();
+                                        emit(or_op, temp1, temp2, $$, 0);
 
                                         fprintf(yyout, "[-] Reduced: expr -> expr OR expr\n");
                                 }
@@ -367,21 +492,6 @@ expr:   assignexpr              {
                                                 $$ = $1;
                                                 fprintf(yyout, "[-] Reduced: expr -> term\n");
                                         } 
-        ;
-
-arithop: PLUS {$$ = add}
-        | MINUS {$$ = sub}
-        | MULTIPLY {$$ = mul}
-        | DIVIDE {$$ = div_op}
-        | MODULO {$$ = mod}
-        ;
-
-relop: GREATER_THAN {$$ = if_greater}
-        | LESS_THAN {$$ = if_less}
-        | GREATER_THAN_EQUAL {$$ = if_greatereq}
-        | LESS_THAN_EQUAL {$$ = if_lesseq}
-        | EQUAL {$$ = if_eq}
-        | NOT_EQUAL {$$ = if_noteq}
         ;
 
 
@@ -394,7 +504,7 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
                                                         check_arith($2, "unary minus (-expr)");
                                                         $$ = newexpr(arithexpr_e);
                                                         $$->sym = istempexpr($2)? $2->sym : newtemp();
-                                                        emit(uminus, $2, nullptr, $$);
+                                                        emit(uminus, $2, nullptr, $$, 0);
                                                         fprintf(yyout, "[-] Reduced: term -> MINUS expr\n");
                                                 }
 
@@ -402,21 +512,22 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
                                                         convert_to_bool($2);
 
                                                         $$ = newexpr(boolexpr_e);
-                                                        $$->truelist = $2->falselist;
-                                                        $$->falselist = $2->truelist;
+                                                        $$->sym = newtemp();
+                                                        emit(not_op, $2, nullptr, $$, 0);
+                                                        fprintf(yyout, "[-] Reduced: term -> NOT expr\n");
                                                 }
 
         | INCREMENT lvalue                      {       
                                                         check_arith($2, "increment (nonlval++)");
                                                         if ($2->type == tableitem_e) {
                                                                 $$ = emit_iftableitem($2);
-                                                                emit(add, $$, newexpr_constnum(1), $$);
-                                                                emit(tablesetelem, $2, $2->index, $$);
+                                                                emit(add, $$, newexpr_constnum(1), $$, 0);
+                                                                emit(tablesetelem, $2, $2->index, $$, 0);
                                                         } else {
-                                                                emit(add, $2, newexpr_constnum(1), $2);
+                                                                emit(add, $2, newexpr_constnum(1), $2, 0);
                                                                 $$ = newexpr(arithexpr_e);
                                                                 $$->sym = newtemp();
-                                                                emit(assign, $2, nullptr, $$);
+                                                                emit(assign, $2, nullptr, $$, 0);
                                                         }
                                                         fprintf(yyout, "[-] Reduced: term -> INCREMENT lvalue\n");
                                                 }
@@ -427,12 +538,12 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
                                                         $$->sym = newtemp();
                                                         if ($1->type == tableitem_e) {
                                                                 expr* val = emit_iftableitem($1);
-                                                                emit(assign, val, nullptr, $$);
-                                                                emit(add, val, newexpr_constnum(1), val);
-                                                                emit(tablesetelem, $1, $1->index, val);
+                                                                emit(assign, val, nullptr, $$, 0);
+                                                                emit(add, val, newexpr_constnum(1), val, 0);
+                                                                emit(tablesetelem, $1, $1->index, val,  0);
                                                         } else {
-                                                                emit(assign, $1, nullptr, $$);
-                                                                emit(add, $1, newexpr_constnum(1), $1);
+                                                                emit(assign, $1, nullptr, $$, 0);
+                                                                emit(add, $1, newexpr_constnum(1), $1, 0);
                                                         }
                                                         fprintf(yyout, "[-] Reduced: term -> lvalue INCREMENT\n");
                                                 }
@@ -441,13 +552,13 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
                                                         check_arith($2, "decrement (nonlval--)");
                                                         if ($2->type == tableitem_e) {
                                                                 $$ = emit_iftableitem($2);
-                                                                emit(sub, $$, newexpr_constnum(1), $$);
-                                                                emit(tablesetelem, $2, $2->index, $$);
+                                                                emit(sub, $$, newexpr_constnum(1), $$, 0);
+                                                                emit(tablesetelem, $2, $2->index, $$, 0);
                                                         } else {
-                                                                emit(sub, $2, newexpr_constnum(1), $2);
+                                                                emit(sub, $2, newexpr_constnum(1), $2, 0);
                                                                 $$ = newexpr(arithexpr_e);
                                                                 $$->sym = newtemp();
-                                                                emit(assign, $2, nullptr, $$);
+                                                                emit(assign, $2, nullptr, $$, 0);
                                                         }
                                                         fprintf(yyout, "[-] Reduced: term -> DECREMENT lvalue\n");
                                                 }
@@ -458,12 +569,12 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
                                                         $$->sym = newtemp();
                                                         if ($1->type == tableitem_e) {
                                                                 expr* val = emit_iftableitem($1);
-                                                                emit(assign, val, nullptr, $$);
-                                                                emit(sub, val, newexpr_constnum(1), val);
-                                                                emit(tablesetelem, $1, $1->index, val);
+                                                                emit(assign, val, nullptr, $$, 0);
+                                                                emit(sub, val, newexpr_constnum(1), val, 0);
+                                                                emit(tablesetelem, $1, $1->index, val, 0);
                                                         } else {
-                                                                emit(assign, $1, nullptr, $$);
-                                                                emit(sub, $1, newexpr_constnum(1), $1);
+                                                                emit(assign, $1, nullptr, $$, 0);
+                                                                emit(sub, $1, newexpr_constnum(1), $1, 0);
                                                         }
                                                         fprintf(yyout, "[-] Reduced: term -> lvalue DECREMENT\n");
                                                 }        
@@ -474,91 +585,35 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
                                                 }
         ;
 
-assignexpr:     lvalue ASSIGN expr              { 
+assignexpr:     lvalue ASSIGN expr              {
                                                         if ($1->sym && $1->sym->type == LIBFUNC) {
                                                                 fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (libfunc = expr) in line %d.\n", yylineno);
                                                                 $$ = newexpr(nil_e);
-                                                        } 
-                                                                
-                                                        if ($1->sym && $1->sym->type == FUNC) {
+                                                        } else if ($1->sym && $1->sym->type == FUNC) {
                                                                 fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func = expr) in line %d.\n", yylineno);
                                                                 $$ = newexpr(nil_e);       
-                                                        }
-
-                                                        if ($1->sym && $1->sym->type == NONLVAL) {
-                                                                fprintf(yyout, "      [!] Error: Cannot use non-lvalue as lvalue (nonlval = expr) in line %d.\n", yylineno);
-                                                                $$ = newexpr(nil_e);
                                                         } else {
+                                                                expr* rval = $3;
+
+                                                                if (rval->type == nil_e) {
+                                                                        fprintf(yyout, "      [!] Warning: Assigning undefined value to variable %s in line %d.\n", $1->sym ? $1->sym->name.c_str(): "?", yylineno);
+                                                                }
+
                                                                 if ($1->type == tableitem_e) {
-                                                                        emit(tablesetelem, $1, $1->index, $3);
+                                                                        emit(tablesetelem, $1, $1->index, $3, 0);
                                                                         $$ = emit_iftableitem($1);
                                                                         $$->type = assignexpr_e;
+
+
                                                                 } else {
-                                                                        emit(assign, $3, nullptr, $1);
+                                                                        emit(assign, $3, nullptr, $1, 0);
                                                                         $$ = newexpr(assignexpr_e);
                                                                         $$->sym = newtemp();
-                                                                        emit(assign, $1, nullptr, $$);
-                                                                } 
+                                                                        emit(assign, $1, nullptr, $$, 0);
+                                                                }
                                                         }
+
                                                         fprintf(yyout, "[-] Reduced: assignexpr -> lvalue ASSIGN expr\n");
-                                                }
-
-                | lvalue PLUS_ASSIGN expr       {       
-                                                        if ($1->sym && $1->sym->type == LIBFUNC) {
-                                                                fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (libfunc += expr) in line %d.\n", yylineno);
-                                                                $$ = newexpr(nil_e);
-                                                        }
-                                                        if ($1->sym && $1->sym->type == FUNC) {
-                                                                fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func += expr) in line %d.\n", yylineno);
-                                                                $$ = newexpr(nil_e);
-                                                        }
-                                                        if ($1->sym && $1->sym->type == NONLVAL) {
-                                                                fprintf(yyout, "      [!] Error: Cannot use non-lvalue as lvalue (nonlval += expr) in line %d.\n", yylineno);
-                                                                $$ = newexpr(nil_e);
-                                                        } else {
-                                                                expr* lv = emit_iftableitem($1);
-                                                                expr* temp = newexpr_tmpvar(arithexpr_e);
-                                                                emit(add, temp, lv, $3);
-
-                                                                if ($1->type == tableitem_e) {
-                                                                emit(tablesetelem, $1, temp, $1->index);
-                                                                } else {
-                                                                emit(assign, $1, temp, nullptr);                     
-                                                                }
-
-                                                                $$ = $1;
-                                                                $$->type = assignexpr_e; 
-                                                        }
-                                                        fprintf(yyout, "[-] Reduced: assignexpr -> lvalue PLUS_ASSIGN expr\n");
-                                                }
-
-                | lvalue MINUS_ASSIGN expr      {
-                                                        if ($1->sym && $1->sym->type == LIBFUNC) {
-                                                                fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (libfunc -= expr) in line %d.\n", yylineno);
-                                                                $$ = newexpr(nil_e);
-                                                        }
-                                                        if ($1->sym && $1->sym->type == FUNC) {
-                                                                fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func -= expr) in line %d.\n", yylineno);
-                                                                $$ = newexpr(nil_e);
-                                                        }
-                                                        if ($1->sym && $1->sym->type == NONLVAL) {
-                                                                fprintf(yyout, "      [!] Error: Cannot use non-lvalue as lvalue (nonlval -= expr) in line %d.\n", yylineno);
-                                                                $$ = newexpr(nil_e);
-                                                        } else {
-                                                                expr* lv = emit_iftableitem($1);               
-                                                                expr* temp = newexpr_tmpvar(arithexpr_e);
-                                                                emit(sub, temp, lv, $3);
-
-                                                                if ($1->type == tableitem_e) {
-                                                                emit(tablesetelem, $1, temp, $1->index);    
-                                                                } else {
-                                                                emit(assign, $1, temp, nullptr);                     
-                                                                }
-
-                                                                $$ = $1;
-                                                                $$->type = assignexpr_e; 
-                                                        }
-                                                        fprintf(yyout, "[-] Reduced: assignexpr -> lvalue MINUS_ASSIGN expr\n");
                                                 }
                 ;
 
@@ -609,7 +664,7 @@ lvalue: IDENTIFIER              {
                                                 $$ = lvalue_expr(entry);
                                         } else {    
                                                 if (found->type == LIBFUNC) {
-                                                        $$ = newexpr(libfunc_e);
+                                                        $$ = newexpr(libraryfunc_e);
                                                         $$->sym = found;
                                                 } else if (found->type == FUNC) {
                                                         $$ = newexpr(programfunc_e);
@@ -653,12 +708,14 @@ lvalue: IDENTIFIER              {
                                                         entry->isGlobal = false;
 
                                                         symTable.insert(entry);
+                                                        $$ = lvalue_expr(entry);
                                                 
                                                 } else if (found->type == FUNC) {
                                                         fprintf(yyout, "      [!] Warning: Local variable is shadowing function in line %d.\n", yylineno);
+                                                        $$ = newexpr(nil_e);
                                                 }
 
-                                                $$ = lvalue_expr(found);
+                                                
                                         } 
                                         fprintf(yyout, "[-] Reduced: lvalue -> LOCAL IDENTIFIER\n");
                                 }
@@ -669,7 +726,7 @@ lvalue: IDENTIFIER              {
                                                         fprintf(yyout, "      [!] Error: Token %s has not been declared in global scope in line %d.\n", $2, yylineno);
                                                         $$ = newexpr(nil_e);
                                                 } else if (found->type == LIBFUNC) {
-                                                        $$ = newexpr(libfunc_e);
+                                                        $$ = newexpr(libraryfunc_e);
                                                         $$->sym = found;
                                                 } else if (found->type == FUNC) {
                                                         $$ = newexpr(programfunc_e);
@@ -758,12 +815,13 @@ normcall:   LEFT_PARENTHESIS elist RIGHT_PARENTHESIS    {
                                                                 $$ = new struct call;
                                                                 $$->elist = $2;
                                                                 $$->method = 0;
-                                                                $$->name = nullptr;
+                                                                $$->name = "";
                                                                 fprintf(yyout, "[-] Reduced: normcall -> LEFT_PARENTHESIS elist RIGHT_PARENTHESIS\n");
                                                         }
             ;
 
 methodcall: DOUBLE_DOT IDENTIFIER LEFT_PARENTHESIS elist RIGHT_PARENTHESIS      {       
+                                                                                        $$ = new struct call;
                                                                                         $$->elist = $4;
                                                                                         $$->method = 1;
                                                                                         $$->name = $2;
@@ -792,9 +850,9 @@ elist: expr                     {
 objectdef: LEFT_BRACKET elist RIGHT_BRACKET     {       
                                                         expr* obj = newexpr(newtable_e);
                                                         obj->sym = newtemp();
-                                                        emit(tablecreate, obj, nullptr, nullptr);
+                                                        emit(tablecreate, obj, nullptr, nullptr, 0);
                                                         for (int i = 0; $2; $2 = $2->next) {
-                                                                emit(tablesetelem, obj, newexpr_constnum(i++), $2);
+                                                                emit(tablesetelem, obj, newexpr_constnum(i++), $2, 0);
                                                         }
                                                         $$ = obj;
                                                         fprintf(yyout, "[-] Reduced: objectdef -> LEFT_BRACKET elist RIGHT_BRACKET\n");
@@ -803,9 +861,9 @@ objectdef: LEFT_BRACKET elist RIGHT_BRACKET     {
         | LEFT_BRACKET indexed RIGHT_BRACKET    {       
                                                         expr* obj = newexpr(newtable_e);
                                                         obj->sym = newtemp();
-                                                        emit(tablecreate, obj, nullptr, nullptr);
+                                                        emit(tablecreate, obj, nullptr, nullptr, 0);
                                                         for (indexed* p = $2; p; p = p->next) {
-                                                                emit(tablesetelem, obj, p->index, p->value);
+                                                                emit(tablesetelem, obj, p->index, p->value, 0);
                                                         }
                                                         $$ = obj;
                                                         fprintf(yyout, "[-] Reduced: objectdef -> LEFT_BRACKET indexed RIGHT_BRACKET\n");
@@ -826,7 +884,7 @@ indexed: indexedelem                            {
 
 indexedelem: LEFT_BRACE expr COLON expr RIGHT_BRACE     {
                                                                 indexed* i = new indexed;
-                                                                i->key = $2;
+                                                                i->index = $2;
                                                                 i->value = $4;
                                                                 i->next = nullptr;
                                                                 $$ = i;
@@ -858,18 +916,18 @@ funcblockend:   /* ε */ {
                         }
 
 funcname: IDENTIFIER            {       
-                                        $$ = $1.str_val;
+                                        $$ = $1;
                                         fprintf(yyout, "[-] Reduced: funcname -> IDENTIFIER\n");
                                 }
 
         | /* empty */           {       
-                                        $$ = generateAnonymousName();
+                                        $$ = strdup(generateAnonymousName().c_str());
                                         fprintf(yyout, "[-] Reduced: funcname -> /* empty */\n");
                                 }
         ;
 
 funcprefix: FUNCTION funcname   {
-                                        Symentry *found = symTable.lookup($2, 0);
+                                        SymEntry *found = symTable.lookup($2, 0);
                                         SymEntry *entry = nullptr;
 
                                         if(found && found->type == LIBFUNC) {
@@ -891,7 +949,7 @@ funcprefix: FUNCTION funcname   {
 
                                                         $$ = entry;
                                                         $$->iaddress = nextquad();
-                                                        emit(funcstart, $$, nullptr, nullptr);
+                                                        emit(funcstart, nullptr, nullptr, lvalue_expr(entry), 0);
                                                         symTable.scopeOffsetStack.push(symTable.currScopeOffset());
                                                         symTable.enterScopeSpace();
                                                         symTable.resetFormalsOff();
@@ -915,25 +973,29 @@ funcprefix: FUNCTION funcname   {
                                         }
                                 }
 
-funcargs: LEFT_PARENTHESIS idlist RIGHT_PARENTHESIS   {
+funcargs: LEFT_PARENTHESIS idlist RIGHT_PARENTHESIS   { 
+                                                        symTable.enter_scope();
                                                         symTable.enterScopeSpace();
                                                         symTable.resetFuncLocalsOff();
+                                                        skipBlockScope = true;
                                                         fprintf(yyout, "[-] Reduced: funcargs -> LEFT_PARENTHESIS elist RIGHT_PARENTHESIS\n");
                                                 }
         ;
 
 funcbody: block {
                         $$ = symTable.currScopeOffset();
-                        symTable.exitScopeSpace();
                 }
 
 funcdef: funcprefix funcargs funcblockstart funcbody funcblockend {
-                                                symTable.exitScopeSpace();
+                                                if (!symTable.funcStack.empty()) {
+                                                        symTable.funcStack.pop();
+                                                }
+
                                                 $1->totalLocals = $4;
                                                 int offset = symTable.top_pop(symTable.scopeOffsetStack);
                                                 symTable.restoreCurrScopeOffset(offset);
                                                 $$ = $1;
-                                                emit(funcend, $1, nullptr, nullptr); 
+                                                emit(funcend, lvalue_expr($1), nullptr, nullptr, 0); 
                                         }
         
 const:  INTEGER         {       
@@ -982,9 +1044,10 @@ idlist: IDENTIFIER      {
 
                                         $$ = newexpr(nil_e);
                                 } else {
-                                        if ((found = symTable.lookup($1, symTable.getScope()))) {
+                                        found = symTable.lookup($1, symTable.getScope());
+                                        if (found) {
                                                 if (found->type == FORARG) fprintf(yyout, "      [!] Error: Formal argument already declared in line %d.\n", yylineno);
-                                                $$ = lvalue_expr(found);
+                                                $$ = newexpr(nil_e);
                                         } else {
                                                 SymEntry* entry = new SymEntry;
                                                 entry->name = $1;
@@ -992,8 +1055,8 @@ idlist: IDENTIFIER      {
                                                 entry->scope = symTable.getScope();
                                                 entry->line = yylineno;
                                                 entry->isActive = true;
-
-                                                entry->isGlobal = entry->scope == 0 ? true : false;
+                                                entry->isGlobal = false;
+                                                
                                                 entry->space = symTable.currScopeSpace();
                                                 entry->offset = symTable.currScopeOffset();
                                                 symTable.incCurrScopeOffset();
@@ -1049,29 +1112,25 @@ idlist: IDENTIFIER      {
         ;
 
 ifprefix: IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS    {
-                                                                convert_to_bool($3);
-
-                                                                patchlist($3->truelist, nextquad());
-
-                                                                $$ = $3->falselist;
+                                                                emit(if_eq, $3, newexpr_constbool(true), nullptr, 0);
+                                                                $$ = nextquad();
+                                                                emit(jump, nullptr, nullptr, nullptr, (0));    
                                                         }
 
 elseprefix: ELSE        {
                                 $$ = nextquad();
-                                emit(jump, nullptr, nullptr, newexpr_constnum(0));
+                                emit(jump, nullptr, nullptr, nullptr, 0);
                         }
 
 
 ifstmt: ifprefix stmt %prec LOWER_THAN_ELSE {
                                 patchlist($1, nextquad());
-                                $$ = nullptr;
                                 fprintf(yyout, "[-] Reduced: ifstmt -> IF (...) stmt\n");
                         }
 
         | ifprefix stmt elseprefix stmt {
                                                 patchlist($1, $3 + 1);
                                                 patchlist($3, nextquad());
-                                                $$ = nullptr; 
                                                 fprintf(yyout, "[-] Reduced: ifstmt -> IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt ELSE stmt\n");
                                         }
         ;
@@ -1092,26 +1151,24 @@ whilestart: WHILE       {
                         }
 
 whilecond: LEFT_PARENTHESIS expr RIGHT_PARENTHESIS      {
-                                                                expr* e = convert_to_bool($2);
-                                                                patchlist(e->truelist, nextquad());
-                                                                $$ = e->falselist;
+                                                                emit(if_eq, $2, newexpr_constbool(true), nullptr, nextquad() + 2);
+                                                                $$ = nextquad();
+                                                                emit(jump, nullptr, nullptr, nullptr, 0);
                                                         }
 
 whilestmt: whilestart whilecond loopstmt    {
-                                                emit(jump, nullptr, nullptr, newexpr_constnum($1));
+                                                emit(jump, nullptr, nullptr, nullptr, $1);
 
-                                                patchlist($2, nextquad());
+                                                patchlabel($2, nextquad());
                                                 patchlist($3->breaklist, nextquad());
                                                 patchlist($3->contlist, $1);
-                                                $$ = nullptr;
-
                                                 fprintf(yyout, "[-] Reduced: whilestmt -> WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt\n");
                                         }
         ;
 
 N :     {
                 $$ = nextquad();
-                emit(jump, nullptr, nullptr, newexpr_constnum(0));
+                emit(jump, nullptr, nullptr, nullptr, 0);
         }
 ;
 
@@ -1121,59 +1178,61 @@ M :     {
 ;
 
 forprefix: FOR LEFT_PARENTHESIS  elist SEMICOLON M expr SEMICOLON {       
-                                                                        $$ = new struct forprefix;
                                                                         $$->test = $5;
-
-                                                                        expr* e = convert_to_bool($6);
-                                                                        patchlist(e->truelist, nextquad());
-                                                                        
                                                                         $$->enter = nextquad();
-                                                                        emit(jump, nullptr, nullptr, newexpr_constnum(0));
+
+                                                                        emit(if_eq, $6, newexpr_constbool(true), nullptr, 0);
                                                                 }
 ;
                                                                 
 
-forstmt: forprefix N elist RIGHT_PARENTHESIS N loopstmt M   {
-                                                                emit(jump, nullptr, nullptr, newexpr_constnum($1->test));
+forstmt: forprefix N elist RIGHT_PARENTHESIS N loopstmt N   {
+                                                                patchlabel($1->enter, $5 + 1);
+                                                                patchlabel($2, nextquad());
+                                                                patchlabel($5, $1->test);
+                                                                patchlabel($7, $2 + 1);
 
                                                                 patchlist($6->breaklist, nextquad());
-                                                                patchlist($6->contlist, $1->test);
-
-                                                                patchlist($6->breaklist, nextquad());
-                                                                patchlist($1->enter, $5 + 1);
-                                                                patchlist($2, nextquad());
-                                                                patchlist($5, $1->test);
-                                                                patchlist($7, $2 + 1);
-
-                                                                $$ = new stmt_t;
-                                                                $$->breaklist = $6->breaklist;
-                                                                $$->contlist = $6->contlist;
+                                                                patchlist($6->contlist, $2 + 1);
 
                                                                 fprintf(yyout, "[-] Reduced: forstmt -> FOR LEFT_PARENTHESIS elist SEMICOLON expr SEMICOLON N elist RIGHT_PARENTHESIS N stmt M\n");
                                                         }
         ;
 
+break: BREAK SEMICOLON {        
+                                if (loopCounterStack.empty() && loopCounter == 0) {
+                                        fprintf(yyout, "      [!] Error: Break statement outside loop in line %d.\n", yylineno);
+                                } else {
+                                        make_stmt($$);
+                                        $$->breaklist = newlist(nextquad());
+                                        emit(jump, nullptr, nullptr, nullptr, 0);
+                                }
+                        }
+
+continue: CONTINUE SEMICOLON    {       
+                                        if (loopCounterStack.empty() && loopCounter == 0) {
+                                                fprintf(yyout, "      [!] Error: Continue statement outside loop in line %d.\n", yylineno);
+                                        } else {
+                                                make_stmt($$);
+                                                $$->contlist = newlist(nextquad());
+                                                emit(jump, nullptr, nullptr, nullptr, 0);
+                                        }
+                                }
+
 returnstmt: RETURN expr SEMICOLON       {       
                                                 if (symTable.funcStack.empty()) {
                                                         fprintf(yyout, "      [!] Error: Return statement outside function in line %d.\n", yylineno);
                                                 } else {
-                                                        emit(getretval, nullptr, nullptr, $2);
+                                                        emit(getretval, nullptr, nullptr, $2, 0);
                                                 }
-                                                $$ = new stmt_t;
-                                                $$->breaklist = 0;
-                                                $$->contlist = 0;
                                                 fprintf(yyout, "[-] Reduced: returnstmt -> RETURN expr SEMICOLON\n");
                                         }
             | RETURN SEMICOLON          {       
                                                 if (symTable.funcStack.empty()) {
                                                         fprintf(yyout, "      [!] Error: Return statement outside function in line %d.\n", yylineno);
                                                 } else {
-                                                        emit(getretval, nullptr, nullptr, newexpr(nil_e));
+                                                        emit(getretval, nullptr, nullptr, newexpr(nil_e), 0);
                                                 }
-
-                                                $$ = new stmt_t;
-                                                $$->breaklist = 0;
-                                                $$->contlist = 0;
                                                 fprintf(yyout, "[-] Reduced: returnstmt -> RETURN SEMICOLON\n");
                                         }
             ;

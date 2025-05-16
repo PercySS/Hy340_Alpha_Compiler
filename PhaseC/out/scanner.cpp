@@ -1064,8 +1064,8 @@ case 5:
 YY_RULE_SETUP
 #line 228 "src/scanner.l"
 {   
-                                    fprintf(yyout, "[+] Shift token integer: %s\n", yytext);
                                     yylval.int_val = atoi(yytext);
+                                    fprintf(yyout, "[+] Shift token integer: %s\n", yytext);
                                     return INTEGER;
                                 }
 	YY_BREAK

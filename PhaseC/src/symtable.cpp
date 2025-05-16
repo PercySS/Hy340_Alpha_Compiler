@@ -22,7 +22,6 @@ SymbolTable::SymbolTable() {
         entry->type = LIBFUNC;
         entry->args.clear();
         insert(entry);
-        delete entry;
     }
 
 

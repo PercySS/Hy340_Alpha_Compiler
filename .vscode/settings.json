@@ -64,7 +64,8 @@
         "optional": "cpp",
         "random": "cpp",
         "string_view": "cpp",
-        "numbers": "cpp"
+        "numbers": "cpp",
+        "cinttypes": "cpp"
     },
     "C_Cpp.default.compilerPath": "g++"
     

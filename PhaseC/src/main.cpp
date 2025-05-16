@@ -13,8 +13,7 @@ extern int yydebug;
 SymbolTable symTable;
 bool skipBlockScope = false;
 int loopCounter = 0;
-std::stack<int> loopStack;
-std::stack<std::string> free_temps;
+std::stack<int> loopCounterStack;
 
 
 int main(int argc, char** argv) {

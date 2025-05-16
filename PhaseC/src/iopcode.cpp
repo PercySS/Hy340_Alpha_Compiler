@@ -7,6 +7,8 @@ extern FILE* yyout;
 extern SymbolTable symTable;
 
 static unsigned temp_counter = 0;
+std::vector<quad> quads;
+static unsigned quad_counter = 0;
 
 // ---------------- new temp var ----------------
 std::string newtempname() {
@@ -40,36 +42,18 @@ SymEntry* newtemp() {
 }
 
 
-// global quad storage
-std::vector<quad> quads;
-
-// global and quad ctr
-static unsigned quad_counter = 0;
-
-// ---------------- Emit ----------------
-void emit(iopcode op, expr* arg1, expr* arg2, expr* result) {
+void emit(iopcode op, expr* arg1, expr* arg2, expr* result, unsigned label) {
     quad q;
     q.op = op;
     q.arg1 = arg1;
     q.arg2 = arg2;
     q.result = result;
-    q.label = 0;
-    q.line = 0;
+    q.label = label;
+    q.line = yylineno;
     quads.push_back(q);
     quad_counter++;
 }
 
-// ---------------- quad index ------------
-unsigned nextquad() {
-    return quad_counter;
-}
-
-void patchlabel(unsigned quadNo, unsigned label) {
-    assert(quadNo < quad_counter && !quads[quadNo].label);
-    quads[quadNo].label = label;
-}
-
-// ---------------- new expression -------------------
 expr* lvalue_expr(SymEntry* sym) {
     assert(sym);
     expr* e = newexpr(var_e);
@@ -79,6 +63,7 @@ expr* lvalue_expr(SymEntry* sym) {
 
     switch (sym->type) {
         case VAR    :   e->type = var_e; break;
+        case FORARG :   e->type = var_e; break;
         case FUNC   :   e->type = programfunc_e; break;
         case LIBFUNC:   e->type = libraryfunc_e; break;
         default     :   assert(false);
@@ -95,31 +80,11 @@ expr* member_item(expr* lvalue, std::string name) {
     return e;
 }
 
-expr* newexpr_tmpvar(expr_t type) {
-    expr* e = newexpr(type);
-    e->sym = newtemp();
-    return e;
-}
-
 expr* newexpr(expr_t type) {
     expr* e = new expr(type);
     e->type = type;
     e->sym = nullptr;
     e->index = nullptr;
-    e->truelist.clear();
-    e->falselist.clear();
-    return e;
-}
-
-expr* newexpr_constnum(double val) {
-    expr* e = newexpr(constnum_e);
-    e->numConst = val;
-    return e;
-}
-
-expr* newexpr_constbool(bool b) {
-    expr* e = newexpr(constbool_e);
-    e->boolConst = b;
     return e;
 }
 
@@ -129,39 +94,54 @@ expr* newexpr_conststring(const std::string& str) {
     return e;
 }
 
-
-expr* make_call(expr* lv, expr* reversed_list) {
-    expr* func = emit_iftableitem(lv);
-    while (reversed_list) {
-        emit(param, reversed_list, nullptr, nullptr);
-        reversed_list = reversed_list->next;
-    }
-
-    emit(call, func, nullptr, nullptr);
-
-    expr* result = newexpr(var_e);
-    result->sym = newtemp();
-
-    emit(getretval, nullptr, nullptr, result);
-    
-    return result;
-}
-
-
 expr* emit_iftableitem(expr* e) {
-    if (e->type == tableitem_e) {
+    if (e->type != tableitem_e) {
         return e;
     } else { 
         expr* result = newexpr(var_e);
         result->sym = newtemp();
-        emit(tablegetelem, e, e->index, result);
+        emit(tablegetelem, e, e->index, result, 0);
         
         return result;
     }
+}
 
+expr* make_call(expr* lv, expr* reversed_list) {
+    expr* func = emit_iftableitem(lv);
+    while (reversed_list) {
+        emit(param, reversed_list, nullptr, nullptr, 0);
+        reversed_list = reversed_list->next;
+    }
+    
+    emit(call, func, nullptr, nullptr, 0);
+    
+    expr* result = newexpr(var_e);
+    result->sym = newtemp();
+    
+    emit(getretval, nullptr, nullptr, result, 0);
+    
+    return result;
+}
+
+expr* newexpr_constnum(double val) {
+    expr* e = newexpr(constnum_e);
+    e->numConst = val;
+    return e;
+}
+
+expr* newexpr_tmpvar(expr_t type) {
+    expr* e = newexpr(type);
+    e->sym = newtemp();
+    return e;
 }
 
 
+
+expr* newexpr_constbool(bool b) {
+    expr* e = newexpr(constbool_e);
+    e->boolConst = b;
+    return e;
+}
 
 bool check_arith(expr* e, std::string context) { 
     if (
@@ -176,7 +156,7 @@ bool check_arith(expr* e, std::string context) {
         comperror("Arithmetic operation on %s", context.c_str());
         return false;
     }
-
+    
     return true;
 }
 
@@ -195,27 +175,39 @@ unsigned int istempexpr(expr* e) {
     return e->type == var_e && istempname(e->sym->name);
 }
 
-void make_stmt(stmt_t* s) {
-    s->breaklist = 0;
-    s->contlist = 0;
+unsigned nextquad() {
+    return quad_counter;
 }
 
-int makelist(int i) {
+void patchlabel(unsigned quadNo, unsigned label) {
+    assert(quadNo < quad_counter);
+    quads[quadNo].label = label;
+}
+
+void make_stmt(stmt_t* s) {
+    s->breaklist = s->contlist = 0;
+}
+
+int newlist(int i) {
     quads[i].label = 0;
     return i;
 }
 
 int mergelist(int l1, int l2) {
-    if (!l1) return l2;
-    if (!l2) return l1;
-
-    int i = l1;
-    while (quads[i].label) {
-        i = quads[i].label;
-    }
-
-    quads[i].label = l2;
-    return l1;
+    if (!l1) {
+        return l2;
+    } else if (!l2) {
+        return l1;
+    } else {
+        int i = l1;
+        
+        while (quads[i].label) {
+            i = quads[i].label;
+        }
+        quads[i].label = l2;
+        return l1;
+    } 
+    
 }
 
 void patchlist(int list, int label) {
@@ -226,51 +218,54 @@ void patchlist(int list, int label) {
     }
 }
 
-
-void convert_to_bool(expr* e) {
-    if (e->type == boolexpr_e) return;
-
-    e->truelist = makelist(nextquad());
-    emit(if_eq, e, newexpr_constbool(true), nullptr); // Αν true πήγαινε εκεί
-
-    e->falselist = makelist(nextquad());
-    emit(jump, nullptr, nullptr, nullptr); // Αλλιώς πήγαινε αλλού
-}
-
-static const char* iopcodeToString(iopcode op) {
-    switch (op) {
-        case assign: return "assign";
-        case add: return "add";
-        case sub: return "sub";
-        case mul: return "mul";
-        case div_op: return "div";
-        case mod: return "mod";
-        case uminus: return "uminus";
-        case and_op: return "and";
-        case or_op: return "or";
-        case not_op: return "not";
-        case if_eq: return "if_eq";
-        case if_noteq: return "if_noteq";
-        case if_lesseq: return "if_lesseq";
-        case if_greatereq: return "if_greatereq";
-        case if_less: return "if_less";
-        case if_greater: return "if_greater";
-        case jump: return "jump";
-        case call: return "call";
-        case param: return "param";
-        case ret: return "ret";
-        case getretval: return "getretval";
-        case funcstart: return "funcstart";
-        case funcend: return "funcend";
-        case tablecreate: return "tablecreate";
-        case tablegetelem: return "tablegetelem";
-        case tablesetelem: return "tablesetelem";
-        default: return "unknown_op";
+expr* convert_to_bool(expr* e) {
+    if (e->type == constbool_e) {
+        return e;
+    } else if (e->type == constnum_e) {
+        return newexpr_constbool(e->numConst != 0);
+    } else if (e->type == conststring_e) {
+        return newexpr_constbool(e->strConst != "");
+    } else if (e->type == nil_e) {
+        return newexpr_constbool(false);
+    } else if (e->type == newtable_e) {
+        return newexpr_constbool(true);
+    } else if (e->type == programfunc_e || e->type == libraryfunc_e) {
+        return newexpr_constbool(true);
+    } else {
+        return e;
     }
 }
 
+void print_quads(FILE* out) {
+    fprintf(out, "\n===================== QUADS =====================\n");
+    fprintf(out, "%-6s | %-12s | %-20s | %-20s | %-20s | %-6s\n", 
+            "Quad#", "Opcode", "Arg1", "Arg2", "Result", "Label");
+    fprintf(out, "--------------------------------------------------------");
+    fprintf(out, "--------------------------------------------------------\n");
+
+    for (unsigned i = 0; i < quads.size(); ++i) {
+        const quad& q = quads[i];
+        
+        fprintf(out, "%-6u | %-12s | %-20s | %-20s | %-20s | ",
+                i + 1,
+                iopcodeToString(q.op),
+                exprToString(q.arg1).c_str(),
+                exprToString(q.arg2).c_str(),
+                exprToString(q.result).c_str());
+
+        if (q.label > 0) {
+            fprintf(out, "%-6u", q.label);
+        } else {
+            fprintf(out, "%-6s", "-");
+        }
+        fprintf(out, "\n");
+    }
+    fprintf(out, "=================== END QUADS ==================\n\n");
+}
+
+
 std::string exprToString(expr* e) {
-    if (!e) return "nil";
+    if (!e) return "";
 
     switch (e->type) {
         case constbool_e:
@@ -278,36 +273,29 @@ std::string exprToString(expr* e) {
         case constnum_e:
             return std::to_string(e->numConst);
         case conststring_e:
-            return "\"" + std::string(e->strConst) + "\"";
+            return "\"" + e->strConst + "\"";
         case var_e:
+        case tableitem_e:
         case arithexpr_e:
         case boolexpr_e:
-        case assignexpr_e:
-        case newtable_e:
+            return e->sym ? e->sym->name : "null";
         case programfunc_e:
+            return "func:" + (e->sym ? e->sym->name : "null");
         case libraryfunc_e:
-            return e->sym ? e->sym->name : "nullsym";
-        case tableitem_e:
-            return (e->sym ? e->sym->name : "nullsym") + "[" +
-                   (e->index ? exprToString(e->index) : "nullindex") + "]";
+            return "lib:" + (e->sym ? e->sym->name : "null");
         default:
-            return "invalid";
+            return "?";
     }
 }
 
-
-void print_quads(FILE* out) {
-    for (unsigned i = 0; i < quads.size(); ++i) {
-        const quad& q = quads[i];
-        fprintf(out, "%-4u: %-12s %-10s %-10s %-10s",
-            i,
-            iopcodeToString(q.op),
-            exprToString(q.result).c_str(),
-            exprToString(q.arg1).c_str(),
-            exprToString(q.arg2).c_str()
-        );
-        if (q.label)
-            fprintf(out, "  [label: %u]", q.label);
-        fprintf(out, "\n");
-    }
+const char* iopcodeToString(iopcode op) {
+    static const char* names[] = {
+        "assign", "add", "sub", "mul", "div", "mod",
+        "uminus", "and", "or", "not",
+        "if_eq", "if_noteq", "if_lesseq", "if_greatereq", "if_less", "if_greater",
+        "jump", "call", "param", "ret",
+        "getretval", "funcstart", "funcend",
+        "tablecreate", "tablegetelem", "tablesetelem"
+    };
+    return names[op];
 }
