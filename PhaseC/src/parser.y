@@ -25,6 +25,7 @@ int yyerror(const char* msg);
 
 // Global variables
 SymEntry* entryFuncDef = nullptr;
+unsigned int jumpfunctag;
 %}
 
 
@@ -182,12 +183,14 @@ stmt: expr SEMICOLON    {
                                 fprintf(yyout, "[-] Reduced: stmt -> returnstmt\n");
                         }
 
-        | continue      {
+        | continue      {       
+                                $$ = $1;
                                 resettemp();
                                 fprintf(yyout, "[-] Reduced: stmt -> BREAK SEMICOLON\n");
                         }
 
         | break    {       
+                        $$ = $1;
                         resettemp();
                         fprintf(yyout, "[-] Reduced: stmt -> CONTINUE SEMICOLON\n");
                 }
@@ -949,6 +952,8 @@ funcprefix: FUNCTION funcname   {
 
                                                         $$ = entry;
                                                         $$->iaddress = nextquad();
+                                                        jumpfunctag = nextquad();
+                                                        emit(jump, nullptr, nullptr, nullptr, 0);
                                                         emit(funcstart, nullptr, nullptr, lvalue_expr(entry), 0);
                                                         symTable.scopeOffsetStack.push(symTable.currScopeOffset());
                                                         symTable.enterScopeSpace();
@@ -990,12 +995,12 @@ funcdef: funcprefix funcargs funcblockstart funcbody funcblockend {
                                                 if (!symTable.funcStack.empty()) {
                                                         symTable.funcStack.pop();
                                                 }
-
+                                                patchlabel(jumpfunctag, nextquad() + 2);
                                                 $1->totalLocals = $4;
                                                 int offset = symTable.top_pop(symTable.scopeOffsetStack);
                                                 symTable.restoreCurrScopeOffset(offset);
                                                 $$ = $1;
-                                                emit(funcend, lvalue_expr($1), nullptr, nullptr, 0); 
+                                                emit(funcend, lvalue_expr($1), nullptr, nullptr, 0);
                                         }
         
 const:  INTEGER         {       
@@ -1111,10 +1116,11 @@ idlist: IDENTIFIER      {
                                 }
         ;
 
-ifprefix: IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS    {
-                                                                emit(if_eq, $3, newexpr_constbool(true), nullptr, 0);
+ifprefix: IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS    {       
+                                                                int label_else = nextquad() + 1 + 2;
+                                                                emit(if_eq, $3, newexpr_constbool(true), nullptr, label_else);
                                                                 $$ = nextquad();
-                                                                emit(jump, nullptr, nullptr, nullptr, (0));    
+                                                                emit(jump, nullptr, nullptr, nullptr, 0);    
                                                         }
 
 elseprefix: ELSE        {
@@ -1129,8 +1135,24 @@ ifstmt: ifprefix stmt %prec LOWER_THAN_ELSE {
                         }
 
         | ifprefix stmt elseprefix stmt {
-                                                patchlist($1, $3 + 1);
-                                                patchlist($3, nextquad());
+                                                patchlist($1, $3 + 1 + 1);
+                                                patchlist($3, nextquad() + 1);
+
+                                                if (!$2 && !$4) {
+                                                        $$ = new stmt_t;
+                                                        make_stmt($$);
+                                                } else if ($2 && !$4) {
+                                                        $$ = $2;
+                                                } else if (!$2 && $4) {
+                                                        $$ = $4;
+                                                } else {
+                                                        $$ = new stmt_t;
+                                                        make_stmt($$);
+                                                        patchlist($$->breaklist, $2->breaklist);
+                                                        patchlist($$->contlist, $2->contlist);
+                                                        patchlist($$->breaklist, $4->breaklist);
+                                                        patchlist($$->contlist, $4->contlist);
+                                                }
                                                 fprintf(yyout, "[-] Reduced: ifstmt -> IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt ELSE stmt\n");
                                         }
         ;
@@ -1147,11 +1169,12 @@ loopstmt: loopstart stmt loopend        {
                                         }
 
 whilestart: WHILE       {
-                                $$ = nextquad();
+                                $$ = nextquad() + 1;
                         }
 
 whilecond: LEFT_PARENTHESIS expr RIGHT_PARENTHESIS      {
-                                                                emit(if_eq, $2, newexpr_constbool(true), nullptr, nextquad() + 2);
+                                                                int after_if = nextquad() + 2 + 1;
+                                                                emit(if_eq, $2, newexpr_constbool(true), nullptr, after_if);
                                                                 $$ = nextquad();
                                                                 emit(jump, nullptr, nullptr, nullptr, 0);
                                                         }
@@ -1159,8 +1182,8 @@ whilecond: LEFT_PARENTHESIS expr RIGHT_PARENTHESIS      {
 whilestmt: whilestart whilecond loopstmt    {
                                                 emit(jump, nullptr, nullptr, nullptr, $1);
 
-                                                patchlabel($2, nextquad());
-                                                patchlist($3->breaklist, nextquad());
+                                                patchlabel($2, nextquad() + 1);
+                                                patchlist($3->breaklist, nextquad() + 1);
                                                 patchlist($3->contlist, $1);
                                                 fprintf(yyout, "[-] Reduced: whilestmt -> WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt\n");
                                         }

@@ -236,57 +236,40 @@ expr* convert_to_bool(expr* e) {
     }
 }
 
-void print_quads(FILE* out) {
-    fprintf(out, "\n===================== QUADS =====================\n");
-    fprintf(out, "%-6s | %-12s | %-20s | %-20s | %-20s | %-6s\n", 
-            "Quad#", "Opcode", "Arg1", "Arg2", "Result", "Label");
-    fprintf(out, "--------------------------------------------------------");
-    fprintf(out, "--------------------------------------------------------\n");
-
-    for (unsigned i = 0; i < quads.size(); ++i) {
-        const quad& q = quads[i];
-        
-        fprintf(out, "%-6u | %-12s | %-20s | %-20s | %-20s | ",
-                i + 1,
-                iopcodeToString(q.op),
-                exprToString(q.arg1).c_str(),
-                exprToString(q.arg2).c_str(),
-                exprToString(q.result).c_str());
-
-        if (q.label > 0) {
-            fprintf(out, "%-6u", q.label);
-        } else {
-            fprintf(out, "%-6s", "-");
-        }
-        fprintf(out, "\n");
-    }
-    fprintf(out, "=================== END QUADS ==================\n\n");
-}
-
-
 std::string exprToString(expr* e) {
-    if (!e) return "";
+    if (!e) return "_";
 
     switch (e->type) {
         case constbool_e:
             return e->boolConst ? "true" : "false";
-        case constnum_e:
-            return std::to_string(e->numConst);
+
+        case constnum_e: {
+            std::ostringstream oss;
+            oss << e->numConst;
+            return oss.str();
+        }
+
         case conststring_e:
             return "\"" + e->strConst + "\"";
+
+        case nil_e:
+            return "nil";
+
         case var_e:
         case tableitem_e:
         case arithexpr_e:
         case boolexpr_e:
-            return e->sym ? e->sym->name : "null";
+        case assignexpr_e:
         case programfunc_e:
-            return "func:" + (e->sym ? e->sym->name : "null");
         case libraryfunc_e:
-            return "lib:" + (e->sym ? e->sym->name : "null");
+        case newtable_e:
+            return (e->sym && e->sym->name != "") ? e->sym->name : "unnamed";
+
         default:
             return "?";
     }
 }
+
 
 const char* iopcodeToString(iopcode op) {
     static const char* names[] = {
@@ -299,3 +282,32 @@ const char* iopcodeToString(iopcode op) {
     };
     return names[op];
 }
+
+void print_quads(FILE* out) {
+    fprintf(out, "\n===================== QUADS =====================\n");
+    fprintf(out, "%-6s | %-12s | %-20s | %-20s | %-20s | %-6s\n", 
+            "Quad#", "Opcode", "Result", "Arg1", "Arg2", "Label");
+    fprintf(out, "--------------------------------------------------------");
+    fprintf(out, "--------------------------------------------------------\n");
+
+    for (unsigned i = 0; i < quads.size(); ++i) {
+        const quad& q = quads[i];
+        
+        fprintf(out, "%-6u | %-12s | %-20s | %-20s | %-20s | ",
+                i + 1,
+                iopcodeToString(q.op),
+                exprToString(q.result).c_str(),
+                exprToString(q.arg1).c_str(),
+                exprToString(q.arg2).c_str());
+
+        if (q.label > 0) {
+            fprintf(out, "%-6u", q.label);
+        } else {
+            fprintf(out, "%-6s", "-");
+        }
+        fprintf(out, "\n");
+    }
+    fprintf(out, "=================== END QUADS ==================\n\n");
+}
+
+
