@@ -88,9 +88,6 @@ struct forprefix {
     int enter;
 };
 
-// ----------- global storage for quads -----------------
-extern std::vector<quad> quads;
-extern std::stack<std::string> free_temps;
 
 // ----------- helper functions -------------------------
 void emit(iopcode op, expr* arg1, expr* arg2, expr* result, unsigned label);
@@ -131,4 +128,5 @@ void patchlabel(unsigned quadNo, unsigned label);
 
 // ----------------- printing functions -----------------
 void print_quads(FILE* output);
+
 #endif // __ICODE_HPP__

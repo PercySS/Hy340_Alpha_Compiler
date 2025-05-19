@@ -63,17 +63,17 @@ SymEntry* SymbolTable::lookup(const std::string& name, int scopet) const {
     // if scope is -1, search in all scopes from the inner to the outer
     if (scopet == -1) {
         for (int i = this->scopes.size() - 1; i >= 0; --i) {
-            for (const auto& pair : this->scopes[i]) {
+            for (auto& pair : this->scopes[i]) {
                 if (pair.first == name && pair.second.isActive) {
-                    return const_cast<SymEntry*>(&pair.second); // return a copy of the entry
+                    return (SymEntry*)(&pair.second); // return a copy of the entry
                 }
             }
         }
     } else {
         // search in the specified scope
-        for (const auto& pair : scopes[scopet]) {
+        for (auto& pair : scopes[scopet]) {
             if (pair.first == name && pair.second.isActive) {
-                return const_cast<SymEntry*>(&pair.second); // return a copy of the entry
+                return (SymEntry*)(&pair.second); // return a copy of the entry
             }
         }
     }

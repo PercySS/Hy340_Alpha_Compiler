@@ -7,6 +7,7 @@ extern FILE* yyout;
 extern SymbolTable symTable;
 
 static unsigned temp_counter = 0;
+extern 
 std::vector<quad> quads;
 static unsigned quad_counter = 0;
 

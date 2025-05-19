@@ -14,6 +14,7 @@ SymbolTable symTable;
 bool skipBlockScope = false;
 int loopCounter = 0;
 std::stack<int> loopCounterStack;
+std::vector<quad> quads;
 
 
 int main(int argc, char** argv) {
@@ -21,6 +22,7 @@ int main(int argc, char** argv) {
     yydebug = 0;
     FILE* input = stdin;
     FILE* output = stdout;
+    quads.reserve(10000); 
 
     if (argc < 2) {
         printf("Usage: %s <input_file> [output_file]\n", argv[0]);
@@ -57,18 +59,19 @@ int main(int argc, char** argv) {
     } else {
         printf("Parsing failed.\n");
     }
-
-    // Print the symbol table
-    symTable.printTable(output);
+    
+    print_quads(output);
+    /* // Print the symbol table
+    symTable.printTable(output); */
 
     // Print the quads
-    print_quads(output);
 
     // Close the input and output files
     fclose(input);
     if (argc >= 3) {
         fclose(output);
     }
+
 
     return 0;
 }

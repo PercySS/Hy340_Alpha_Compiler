@@ -1,5 +1,3 @@
-# === File: PhaseC/Makefile ===
-
 # Tools
 CXX      = g++
 FLEX     = flex

@@ -109,7 +109,7 @@ unsigned int jumpfunctag;
 %token ERROR_ESCAPE
 %token UNDEF
 
-
+%type <node>    program
 %type <expr>    expr term
 %type <expr>    lvalue call primary objectdef
 %type <expr>    assignexpr elist member idlist errors const
@@ -120,9 +120,8 @@ unsigned int jumpfunctag;
 %type <callval> callsuffix normcall methodcall 
 %type <indexed> indexed indexedelem   
 %type <str_val> funcname
-%type <offset> ifprefix elseprefix N M funcbody
 %type <forprefix> forprefix
-%type <int_val> whilestart whilecond loopstart loopend
+%type <int_val> whilestart whilecond loopstart loopend ifprefix elseprefix N M funcbody
 
 
 
@@ -142,7 +141,7 @@ unsigned int jumpfunctag;
 %left DOT DOUBLE_DOT
 %left LEFT_BRACKET RIGHT_BRACKET
 %left LEFT_PARENTHESIS RIGHT_PARENTHESIS  
-%left RIGHT_BRACE LEFT_BRACE 
+%left LEFT_BRACE RIGHT_BRACE 
 
 
 %%
@@ -152,70 +151,57 @@ program: stmt_list      {
         ;
 
 stmt: expr SEMICOLON    {       
-                                $$ = new stmt_t;
-                                make_stmt($$);
                                 resettemp();
+                                $$ = new stmt_t;
                                 fprintf(yyout, "[-] Reduced: stmt -> expr SEMICOLON\n");
                         }
 
         | ifstmt        {
-                                $$ = $1;
                                 resettemp();
                                 fprintf(yyout, "[-] Reduced: stmt -> ifstmt\n");
                         }
 
         | whilestmt     {
-                                $$ = $1;
                                 resettemp();
                                 fprintf(yyout, "[-] Reduced: stmt -> whilestmt\n");
                         }
 
         | forstmt       {
-                                $$ = $1;
                                 resettemp();
                                 fprintf(yyout, "[-] Reduced: stmt -> forstmt\n");
                         }
 
         | returnstmt    {       
-                                if (symTable.funcStack.empty()) fprintf(yyout, "      [!] Error: Return statement outside of function in line %d.\n", yylineno);
-                                $$ = $1;
                                 resettemp();
                                 fprintf(yyout, "[-] Reduced: stmt -> returnstmt\n");
                         }
 
-        | continue      {       
-                                $$ = $1;
+        | continue      {
                                 resettemp();
                                 fprintf(yyout, "[-] Reduced: stmt -> BREAK SEMICOLON\n");
                         }
 
-        | break    {       
-                        $$ = $1;
+        | break    {
                         resettemp();
                         fprintf(yyout, "[-] Reduced: stmt -> CONTINUE SEMICOLON\n");
                 }
 
-        | block                 {       
-                                        $$ = $1;
+        | block                 {
                                         resettemp();
                                         fprintf(yyout, "[-] Reduced: stmt -> block\n");
                                 }
 
         | funcdef               {
-                                        $$ = new stmt_t;
-                                        make_stmt($$);
                                         resettemp();
                                         fprintf(yyout, "[-] Reduced: stmt -> funcdef\n");
                                 }
 
-        | SEMICOLON             {       
+        | SEMICOLON             {
                                         resettemp();
                                         fprintf(yyout, "[-] Reduced: stmt -> SEMICOLON\n");
                                 }
 
         | errors                {
-                                        $$ = new stmt_t;
-                                        make_stmt($$);
                                         resettemp();
                                         fprintf(yyout, "[-] Reduced: stmt -> errors\n");
                                 }
@@ -241,13 +227,11 @@ stmt_list:      stmt stmt_list  {
                                         fprintf(yyout, "[-] Reduced: stmt_list -> stmt\n");
                                 }
 
-                |               {     
-                                                $$ = nullptr;
+                |               {
                                                 fprintf(yyout, "[-] Reduced: stmt_list -> stmt_list stmt\n");
                                 }
 
-expr:   assignexpr              {       
-                                        $$ = $1;
+expr:   assignexpr              {
                                         fprintf(yyout, "[-] Reduced: expr -> assignexpr\n");
                                 }
 
@@ -258,7 +242,6 @@ expr:   assignexpr              {
                                                 } else {
                                                         $$ = newexpr(arithexpr_e);
                                                         $$->sym = newtemp();
-                                                        if ($1->type == constnum_e && $3->type == constnum_e) $$->numConst = $1->numConst + $3->numConst;
                                                         
                                                         emit(add, $1, $3, $$, 0);
                                                 }
@@ -273,7 +256,6 @@ expr:   assignexpr              {
                                                 } else {
                                                         $$ = newexpr(arithexpr_e);
                                                         $$->sym = newtemp();
-                                                        if ($1->type == constnum_e && $3->type == constnum_e) $$->numConst = $1->numConst - $3->numConst;
                                                         emit(sub, $1, $3, $$, 0);
                                                 }
 
@@ -287,7 +269,6 @@ expr:   assignexpr              {
                                                 } else {
                                                         $$ = newexpr(arithexpr_e);
                                                         $$->sym = newtemp();
-                                                        if ($1->type == constnum_e && $3->type == constnum_e) $$->numConst = $1->numConst * $3->numConst;
                                                         emit(mul, $1, $3, $$, 0);
                                                 }
 
@@ -305,7 +286,6 @@ expr:   assignexpr              {
                                                         } else {
                                                                 $$ = newexpr(arithexpr_e);
                                                                 $$->sym = newtemp();
-                                                                $$->numConst = $1->numConst / $3->numConst;
                                                                 emit(div_op, $1, $3, $$, 0);
                                                         }
                                                 } else {
@@ -328,7 +308,6 @@ expr:   assignexpr              {
                                                         } else {
                                                                 $$ = newexpr(arithexpr_e);
                                                                 $$->sym = newtemp();
-                                                                $$->numConst = (int) $1->numConst % (int) $3->numConst;
                                                                 emit(mod, $1, $3, $$, 0);
                                                         }
                                                 } else {
@@ -522,6 +501,8 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
 
         | INCREMENT lvalue                      {       
                                                         check_arith($2, "increment (nonlval++)");
+                                                        $$ = newexpr(var_e);
+                                                        $$->sym = newtemp();
                                                         if ($2->type == tableitem_e) {
                                                                 $$ = emit_iftableitem($2);
                                                                 emit(add, $$, newexpr_constnum(1), $$, 0);
@@ -591,27 +572,18 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
 assignexpr:     lvalue ASSIGN expr              {
                                                         if ($1->sym && $1->sym->type == LIBFUNC) {
                                                                 fprintf(yyout, "      [!] Error: Cannot use library function as lvalue (libfunc = expr) in line %d.\n", yylineno);
-                                                                $$ = newexpr(nil_e);
                                                         } else if ($1->sym && $1->sym->type == FUNC) {
-                                                                fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func = expr) in line %d.\n", yylineno);
-                                                                $$ = newexpr(nil_e);       
+                                                                fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func = expr) in line %d.\n", yylineno);      
                                                         } else {
-                                                                expr* rval = $3;
-
-                                                                if (rval->type == nil_e) {
-                                                                        fprintf(yyout, "      [!] Warning: Assigning undefined value to variable %s in line %d.\n", $1->sym ? $1->sym->name.c_str(): "?", yylineno);
-                                                                }
 
                                                                 if ($1->type == tableitem_e) {
                                                                         emit(tablesetelem, $1, $1->index, $3, 0);
                                                                         $$ = emit_iftableitem($1);
                                                                         $$->type = assignexpr_e;
-
-
                                                                 } else {
                                                                         emit(assign, $3, nullptr, $1, 0);
                                                                         $$ = newexpr(assignexpr_e);
-                                                                        $$->sym = newtemp();
+                                                                        
                                                                         emit(assign, $1, nullptr, $$, 0);
                                                                 }
                                                         }
@@ -628,15 +600,11 @@ primary: lvalue                 {
         | call                  {       
                                         if ($1->type == tableitem_e && !$1->sym) {
                                                 fprintf(stderr, "[!] Invalid table item call at line %d\n", yylineno);
-                                                $$ = newexpr(nil_e);
-                                        } else {
-                                                $$ = $1;
                                         }
                                         fprintf(yyout, "[-] Reduced: primary -> call\n");
                                 }
 
-        | objectdef             {       
-                                        $$ = $1;
+        | objectdef             {
                                         fprintf(yyout, "[-] Reduced: primary -> objectdef\n");
                                 }
 
@@ -646,7 +614,6 @@ primary: lvalue                 {
                                                                 fprintf(yyout, "[-] Reduced: primary -> LEFT_PARENTHESIS funcdef RIGHT_PARENTHESIS\n");
                                                         }
         | const                 {
-                                        $$ = $1;
                                         fprintf(yyout, "[-] Reduced: primary -> const\n");
                                 }
         ;
@@ -664,7 +631,7 @@ lvalue: IDENTIFIER              {
                                                 entry->isGlobal = (entry->scope == 0);
 
                                                 symTable.insert(entry);
-                                                $$ = lvalue_expr(entry);
+                                                $$ = lvalue_expr(symTable.lookup($1));
                                         } else {    
                                                 if (found->type == LIBFUNC) {
                                                         $$ = newexpr(libraryfunc_e);
@@ -745,6 +712,7 @@ lvalue: IDENTIFIER              {
 
         | member                        {       
                                                 $$ = $1;
+                                                fprintf(yyout, "                      im %s\n", $$->sym->name.c_str());
                                                 fprintf(yyout, "[-] Reduced: lvalue -> member\n");
                                         }
         ;
@@ -754,7 +722,7 @@ member: lvalue DOT IDENTIFIER   {
                                         fprintf(yyout, "[-] Reduced: member -> lvalue DOT IDENTIFIER\n");
                                 }
 
-        | lvalue LEFT_BRACKET expr RIGHT_BRACKET        {
+        | lvalue LEFT_BRACKET expr RIGHT_BRACKET        { 
                                                                 $1 = emit_iftableitem($1);
                                                                 $$ = newexpr(tableitem_e);
                                                                 $$->sym = $1->sym;
@@ -762,17 +730,11 @@ member: lvalue DOT IDENTIFIER   {
                                                                 fprintf(yyout, "[-] Reduced: member -> lvalue LEFT_BRACKET expr RIGHT_BRACKET\n");
                                                         }
 
-        | call DOT IDENTIFIER                           {       
-                                                                $$ = member_item($1, $3);
+        | call DOT IDENTIFIER                           {
                                                                 fprintf(yyout, "[-] Reduced: member -> call DOT IDENTIFIER\n");
                                                         }
 
         | call LEFT_BRACKET expr RIGHT_BRACKET          {
-                                                                $$ = newexpr(tableitem_e);
-                                                                $1 = emit_iftableitem($1);
-                                                                $$->sym = $1->sym;
-                                                                $$->index = $3;
-                                                                
                                                                 fprintf(yyout, "[-] Reduced: member -> call LEFT_BRACKET expr RIGHT_BRACKET\n");
                                                         } 
         ;
@@ -834,7 +796,6 @@ methodcall: DOUBLE_DOT IDENTIFIER LEFT_PARENTHESIS elist RIGHT_PARENTHESIS      
 
 elist: expr                     {       
                                         $$ = $1;
-                                        $$->next = nullptr;
                                         fprintf(yyout, "[-] Reduced: elist -> expr\n");
                                 }
 
@@ -853,9 +814,9 @@ elist: expr                     {
 objectdef: LEFT_BRACKET elist RIGHT_BRACKET     {       
                                                         expr* obj = newexpr(newtable_e);
                                                         obj->sym = newtemp();
-                                                        emit(tablecreate, obj, nullptr, nullptr, 0);
+                                                        emit(tablecreate, obj, nullptr, nullptr, nextquad());
                                                         for (int i = 0; $2; $2 = $2->next) {
-                                                                emit(tablesetelem, obj, newexpr_constnum(i++), $2, 0);
+                                                                emit(tablesetelem, obj, newexpr_constnum(i++), $2, nextquad());
                                                         }
                                                         $$ = obj;
                                                         fprintf(yyout, "[-] Reduced: objectdef -> LEFT_BRACKET elist RIGHT_BRACKET\n");
@@ -864,7 +825,7 @@ objectdef: LEFT_BRACKET elist RIGHT_BRACKET     {
         | LEFT_BRACKET indexed RIGHT_BRACKET    {       
                                                         expr* obj = newexpr(newtable_e);
                                                         obj->sym = newtemp();
-                                                        emit(tablecreate, obj, nullptr, nullptr, 0);
+                                                        emit(tablecreate, obj, nullptr, nullptr, nextquad());
                                                         for (indexed* p = $2; p; p = p->next) {
                                                                 emit(tablesetelem, obj, p->index, p->value, 0);
                                                         }
@@ -901,9 +862,16 @@ block: LEFT_BRACE       {
                                 } else {
                                         symTable.enter_scope();
                                 }
-                        } stmt_list RIGHT_BRACE {
-                                                        symTable.exit_scope();   
-                                                        $$ = $3;
+                        } stmt_list RIGHT_BRACE {      
+                                                        symTable.exit_scope();
+                                                        /* Reacctivate formals */
+                                                        if (!symTable.funcStack.empty()) {
+                                                                if (symTable.funcStack.top()->type == FUNC) {
+                                                                        for (auto it = symTable.funcStack.top()->args.begin(); it != symTable.funcStack.top()->args.end(); ++it) {
+                                                                                (*it)->isActive = true;
+                                                                        }
+                                                                }
+                                                        }
                                                         fprintf(yyout, "[-] Reduced: block -> LEFT_BRACE stmt_list RIGHT_BRACE\n");
                                                 }
         ;
@@ -1005,7 +973,7 @@ funcdef: funcprefix funcargs funcblockstart funcbody funcblockend {
         
 const:  INTEGER         {       
                                 $$ = newexpr_constnum(yylval.int_val);
-                                $$->type = constnum_e; 
+                                $$->type = constnum_e;
                                 fprintf(yyout, "[-] Reduced: const -> INTEGER\n");
                         }
 
@@ -1116,11 +1084,10 @@ idlist: IDENTIFIER      {
                                 }
         ;
 
-ifprefix: IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS    {       
-                                                                int label_else = nextquad() + 1 + 2;
-                                                                emit(if_eq, $3, newexpr_constbool(true), nullptr, label_else);
+ifprefix: IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS    {
+                                                                emit(if_eq, $3, newexpr_constbool(true), nullptr, nextquad() + 2);
                                                                 $$ = nextquad();
-                                                                emit(jump, nullptr, nullptr, nullptr, 0);    
+                                                                emit(jump, nullptr, nullptr, nullptr, nextquad());    
                                                         }
 
 elseprefix: ELSE        {
@@ -1130,68 +1097,60 @@ elseprefix: ELSE        {
 
 
 ifstmt: ifprefix stmt %prec LOWER_THAN_ELSE {
-                                patchlist($1, nextquad());
+                                patchlabel($1, nextquad());
                                 fprintf(yyout, "[-] Reduced: ifstmt -> IF (...) stmt\n");
                         }
 
         | ifprefix stmt elseprefix stmt {
-                                                patchlist($1, $3 + 1 + 1);
-                                                patchlist($3, nextquad() + 1);
-
-                                                if (!$2 && !$4) {
-                                                        $$ = new stmt_t;
-                                                        make_stmt($$);
-                                                } else if ($2 && !$4) {
-                                                        $$ = $2;
-                                                } else if (!$2 && $4) {
-                                                        $$ = $4;
-                                                } else {
-                                                        $$ = new stmt_t;
-                                                        make_stmt($$);
-                                                        patchlist($$->breaklist, $2->breaklist);
-                                                        patchlist($$->contlist, $2->contlist);
-                                                        patchlist($$->breaklist, $4->breaklist);
-                                                        patchlist($$->contlist, $4->contlist);
-                                                }
+                                                patchlabel($1, $3 + 1);
+                                                patchlabel($3, nextquad());
                                                 fprintf(yyout, "[-] Reduced: ifstmt -> IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt ELSE stmt\n");
                                         }
         ;
 
 loopstart: /* ε*/      {
                                 ++loopCounter;
+                                fprintf(yyout, "[-] Reduced: loopstart -> /* ε */\n");
                         }
 
 loopend:   /* ε*/       {
                                 --loopCounter;
+                                fprintf(yyout, "[-] Reduced: loopend -> /* ε */\n");
                         }
 loopstmt: loopstart stmt loopend        {
-                                                $$ = $2;
+                                                $$ = new stmt_t;
+                                                if ($2) {
+                                                        $$->breaklist = $2->breaklist;
+                                                        $$->contlist = $2->contlist;
+                                                }
+                                                fprintf(yyout, "[-] Reduced: loopstmt -> stmt\n");
                                         }
 
 whilestart: WHILE       {
-                                $$ = nextquad() + 1;
+                                $$ = nextquad();
                         }
 
 whilecond: LEFT_PARENTHESIS expr RIGHT_PARENTHESIS      {
-                                                                int after_if = nextquad() + 2 + 1;
-                                                                emit(if_eq, $2, newexpr_constbool(true), nullptr, after_if);
+                                                                emit(if_eq, $2, newexpr_constbool(true), nullptr, nextquad() + 2);
                                                                 $$ = nextquad();
-                                                                emit(jump, nullptr, nullptr, nullptr, 0);
+                                                                emit(jump, nullptr, nullptr, nullptr, nextquad());
+
                                                         }
 
 whilestmt: whilestart whilecond loopstmt    {
                                                 emit(jump, nullptr, nullptr, nullptr, $1);
+                                                patchlabel($2, nextquad());
 
-                                                patchlabel($2, nextquad() + 1);
-                                                patchlist($3->breaklist, nextquad() + 1);
-                                                patchlist($3->contlist, $1);
-                                                fprintf(yyout, "[-] Reduced: whilestmt -> WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt\n");
+                                                fprintf(yyout, "WHILE: patching breaklist of stmt %p\n", $3);
+                                                patchlist($3->breaklist, nextquad());
+                                                patchlist($3->contlist, nextquad());
+                                                fprintf(yyout, "                                [-] Reduced: whilestmt -> WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt\n");
                                         }
         ;
 
 N :     {
                 $$ = nextquad();
-                emit(jump, nullptr, nullptr, nullptr, 0);
+                emit(jump, nullptr, nullptr, nullptr, nextquad());
         }
 ;
 
@@ -1200,12 +1159,13 @@ M :     {
         }
 ;
 
-forprefix: FOR LEFT_PARENTHESIS  elist SEMICOLON M expr SEMICOLON {       
-                                                                        $$->test = $5;
-                                                                        $$->enter = nextquad();
+forprefix: FOR LEFT_PARENTHESIS  elist SEMICOLON M expr SEMICOLON       {       
+                                                                                $$ = new struct forprefix;
+                                                                                $$->test = $5;
+                                                                                $$->enter = nextquad();
 
-                                                                        emit(if_eq, $6, newexpr_constbool(true), nullptr, 0);
-                                                                }
+                                                                                emit(if_eq, $6, newexpr_constbool(true), nullptr, nextquad());
+                                                                        }
 ;
                                                                 
 
@@ -1222,22 +1182,19 @@ forstmt: forprefix N elist RIGHT_PARENTHESIS N loopstmt N   {
                                                         }
         ;
 
-break: BREAK SEMICOLON {        
-                                if (loopCounterStack.empty() && loopCounter == 0) {
+break: BREAK SEMICOLON {
+                                if (loopCounter == 0) {
                                         fprintf(yyout, "      [!] Error: Break statement outside loop in line %d.\n", yylineno);
                                 } else {
-                                        make_stmt($$);
-                                        $$->breaklist = newlist(nextquad());
                                         emit(jump, nullptr, nullptr, nullptr, 0);
                                 }
+                                fprintf(yyout, "[-] Reduced: break -> BREAK SEMICOLON\n");
                         }
 
-continue: CONTINUE SEMICOLON    {       
-                                        if (loopCounterStack.empty() && loopCounter == 0) {
+continue: CONTINUE SEMICOLON    {
+                                        if (loopCounter == 0) {
                                                 fprintf(yyout, "      [!] Error: Continue statement outside loop in line %d.\n", yylineno);
                                         } else {
-                                                make_stmt($$);
-                                                $$->contlist = newlist(nextquad());
                                                 emit(jump, nullptr, nullptr, nullptr, 0);
                                         }
                                 }
