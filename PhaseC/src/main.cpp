@@ -1,6 +1,10 @@
-#include "symtable.hpp"
-#include "parser.tab.hpp"
-#include "iopcode.hpp"
+#include "./include/symTable.hpp"
+#include "include/backpatch.hpp"
+#include "include/expr.hpp"
+#include "include/symTable.hpp"
+#include "include/quad.hpp"
+#include "include/temp.hpp"
+#include "include/types.hpp"
 #include <cstdio>
 #include <cstdlib> 
 
@@ -13,16 +17,19 @@ extern int yydebug;
 SymbolTable symTable;
 bool skipBlockScope = false;
 int loopCounter = 0;
+extern std::vector<quad*> quads;
 std::stack<int> loopCounterStack;
-std::vector<quad> quads;
+
+void cleanup();
 
 
 int main(int argc, char** argv) {
+    // Initialize the quads
+    init_quads();
     // handle the input output according to arguments
     yydebug = 0;
     FILE* input = stdin;
     FILE* output = stdout;
-    quads.reserve(10000); 
 
     if (argc < 2) {
         printf("Usage: %s <input_file> [output_file]\n", argv[0]);
@@ -42,7 +49,7 @@ int main(int argc, char** argv) {
     if (argc == 3) {
         outputFile = fopen(argv[2], "w");
         if (!outputFile) {
-            std::cerr << "Error: Could not open output file." << argv[2] << std::endl;
+            printf("Error: Could not open output file\n");
             fclose(input);
             return 1;
         }
@@ -72,6 +79,16 @@ int main(int argc, char** argv) {
         fclose(output);
     }
 
+    cleanup();
 
     return 0;
+}
+
+void cleanup() {
+    // Cleanup code here
+    // Free any dynamically allocated memory, close files, etc.
+    for (auto& quad : quads) {
+        delete quad;
+    }
+    quads.clear();
 }

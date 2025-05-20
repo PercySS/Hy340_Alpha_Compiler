@@ -1,7 +1,9 @@
 %{
 #include "parser.tab.hpp"
-#include "../src/symtable.hpp"
-
+#include "../src/include/symTable.hpp"
+#include <iostream>
+#include <cstdlib>
+#include <cstring>
 extern void yyerror(const char* msg);
 
 std::stack<int> tokenStack;
