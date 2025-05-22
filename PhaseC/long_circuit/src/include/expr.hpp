@@ -33,9 +33,11 @@ expr* newexpr_constbool(bool val);
 expr* newexpr_conststring(const std::string& str);
 expr* make_call(expr* e, expr* arglist);
 expr* member_item(expr* e, std::string name);
+expr* reverse(expr* head);
 
 // semantic & bool conversion
 bool        check_arith(expr* e, std::string context);
+bool check_constexpr(expr* e);
 void        comperror(const char* msg, const char* context);
 expr*       convert_to_bool(expr* e);
 void        release_temp(expr* e);

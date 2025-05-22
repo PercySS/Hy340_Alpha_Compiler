@@ -33,7 +33,7 @@ int yyerror(const char* msg);
 
 // Global variables
 SymEntry* entryFuncDef = nullptr;
-unsigned int jumpfunctag;
+std::stack<unsigned int> jumpfunctag = std::stack<unsigned int>();
 unsigned int jumpfromreturntag;
 std::stack<std::stack<unsigned int>> returns = std::stack<std::stack<unsigned int>>();
 
@@ -163,16 +163,24 @@ program: stmt_list      {
         ;
 
 stmt: expr SEMICOLON    {       
-                                resettemp();
                                 $$ = new struct stmt_t;
                                 make_stmt($$);
+                                resettemp();
+                                if ($1->type == boolexpr_e) {
+                                        backpatch($1->truelist, nextquad());
+                                        backpatch($1->falselist, nextquad() + 2);
+                                        emit(assign, newexpr_constbool(true), nullptr, $1, 0);
+                                        emit(jump, nullptr, nullptr, nullptr, nextquad() + 2);
+                                        emit(assign, newexpr_constbool(false), nullptr, $1, 0);
+                                }
                                 fprintf(yyout, "[-] Reduced: stmt -> expr SEMICOLON\n");
                         }
 
         | ifstmt        {       
-                                resettemp();
+                                
                                 $$ = new struct stmt_t;
                                 make_stmt($$);
+                                resettemp();
                                 fprintf(yyout, "[-] Reduced: stmt -> ifstmt\n");
                         }
 
@@ -312,7 +320,8 @@ expr:   assignexpr              {
                                         }
 
         | expr LESS_THAN expr           {
-                                                $$ = emit_relop(if_less, $1, $3, $$)  ;                                            
+
+                                                $$ = emit_relop(if_less, $1, $3, $$);
 
                                                 fprintf(yyout, "[-] Reduced: expr -> expr LESS_THAN expr\n");
                                         }
@@ -327,36 +336,96 @@ expr:   assignexpr              {
                                                 $$ = emit_relop(if_greatereq, $1, $3, $$);
 
                                                 fprintf(yyout, "[-] Reduced: expr -> expr GREATER_THAN_EQUAL expr\n");
-        }
+                                                }
 
         | expr LESS_THAN_EQUAL expr    {
                                                 $$ = emit_relop(if_lesseq, $1, $3, $$);
 
                                                 fprintf(yyout, "[-] Reduced: expr -> expr LESS_THAN_EQUAL expr\n");
-        }
+                                        }
 
-        | expr EQUAL expr           {       
-                                        $$ = emit_relop(if_eq, $1, $3, $$);
+        | expr EQUAL expr       {       
+                                        checkforeqop($1, $3);
 
+                                        if ($1->type == boolexpr_e) {
+                                                backpatch($1->truelist, nextquad());
+                                                backpatch($1->falselist, nextquad() + 2);
+                                                emit(assign, newexpr_constbool(true), nullptr, $1, 0);
+                                                emit(jump, nullptr, nullptr, nullptr, nextquad() + 3);
+                                                emit(assign, newexpr_constbool(false), nullptr, $1, 0);
+                                        }
+
+                                        if ($3->type == boolexpr_e) {
+                                                backpatch($3->truelist, nextquad());
+                                                backpatch($3->falselist, nextquad() + 2);
+                                                emit(assign, newexpr_constbool(true), nullptr, $3, 0);
+                                                emit(jump, nullptr, nullptr, nullptr, nextquad() + 3);
+                                                emit(assign, newexpr_constbool(false), nullptr, $3, 0);
+                                        }
+                                        
+                                        $$ = newexpr(boolexpr_e);
+                                        $$->sym = newtemp();
+
+                                        $$->truelist.push_back(nextquad() - 1);
+                                        emit(if_eq, $1, $3, nullptr, 0);
+                                        $$->falselist.push_back(nextquad() - 1);
+                                        emit(jump, nullptr, nullptr, nullptr, 0);
 
                                         fprintf(yyout, "[-] Reduced: expr -> expr EQUAL expr\n");
                                 }
 
-        | expr NOT_EQUAL expr        {       
-                                        $$ = emit_relop(if_noteq, $1, $3, $$);
+        | expr NOT_EQUAL expr   {       
+                                        checkforeqop($1, $3);
+
+                                        if ($1->type == boolexpr_e) {
+                                                backpatch($1->truelist, nextquad());
+                                                backpatch($1->falselist, nextquad() + 2);
+                                                emit(assign, newexpr_constbool(true), nullptr, $1, 0);
+                                                emit(jump, nullptr, nullptr, nullptr, nextquad() + 3);
+                                                emit(assign, newexpr_constbool(false), nullptr, $1, 0);
+                                        }
+
+                                        if ($3->type == boolexpr_e) {
+                                                backpatch($3->truelist, nextquad());
+                                                backpatch($3->falselist, nextquad() + 2);
+                                                emit(assign, newexpr_constbool(true), nullptr, $3, 0);
+                                                emit(jump, nullptr, nullptr, nullptr, nextquad() + 3);
+                                                emit(assign, newexpr_constbool(false), nullptr, $3, 0);
+                                        }
+                                        
+                                        $$ = newexpr(boolexpr_e);
+                                        $$->sym = newtemp();
+
+                                        $$->truelist.push_back(nextquad() - 1);
+                                        emit(if_noteq, $1, $3, nullptr, 0);
+                                        $$->falselist.push_back(nextquad() - 1);
+                                        emit(jump, nullptr, nullptr, nullptr, 0);
+
 
                                         fprintf(yyout, "[-] Reduced: expr -> expr NOT_EQUAL expr\n");
                                 }                                        
 
-        |expr AND expr          {       
-                                        $$ = emit_bool(and_op, $1, $3, $$);
+        |expr AND {if ($1->type != boolexpr_e) convertToBool($1);} M expr        {       
+                        
+                                        if ($5->type != boolexpr_e) convertToBool($5);
+                                        backpatch($1->truelist, $4);
+
+                                        $$ = newexpr(boolexpr_e);
+                                        $$->sym = newtemp();
+                                        $$->truelist = $5->truelist;
+                                        $$->falselist = mergelist($1->falselist, $5->falselist);
 
                                         fprintf(yyout, "[-] Reduced: expr -> expr AND expr\n");
                                 }
         
-        | expr OR expr           {       
-                                        $$ = emit_bool(or_op, $1, $3, $$);
-
+        | expr OR {if ($1->type != boolexpr_e) convertToBool($1);} M expr        {       
+                                
+                                        if ($5->type != boolexpr_e) convertToBool($5);
+                                        backpatch($1->falselist, $4);
+                                        $$ = newexpr(boolexpr_e);
+                                        $$->sym = newtemp();
+                                        $$->truelist = mergelist($1->truelist, $5->truelist);
+                                        $$->falselist = $5->falselist;
                                         fprintf(yyout, "[-] Reduced: expr -> expr OR expr\n");
                                 }
 
@@ -380,8 +449,16 @@ term:   LEFT_PARENTHESIS expr RIGHT_PARENTHESIS {
                                                         fprintf(yyout, "[-] Reduced: term -> MINUS expr\n");
                                                 }
 
-        | NOT expr %prec LOWER_THAN_ELSE                     { 
-                                                        $$ = emit_bool(not_op, $2, nullptr, nullptr);
+        | NOT expr %prec LOWER_THAN_ELSE        {
+                                                        if ($2->type != boolexpr_e) {
+                                                                convertToBool($2);
+                                                        }
+                                                        
+                                                        std::vector<unsigned int> temp = $2->truelist;
+                                                        $2->truelist = $2->falselist;
+                                                        $2->falselist = temp;
+                                                        $$ = $2;
+                                                        
                                                         fprintf(yyout, "[-] Reduced: term -> NOT expr\n");
                                                 }
 
@@ -459,7 +536,21 @@ assignexpr:     lvalue ASSIGN expr              {
                                                         } else if ($1->sym && $1->sym->type == FUNC) {
                                                                 fprintf(yyout, "      [!] Error: Cannot use function as lvalue (func = expr) in line %d.\n", yylineno);      
                                                         } else {
+                                                                
+                                                                if ($3->type == boolexpr_e) {
+                                                                        convertToBool($3);
 
+                                                                        expr* result = newexpr(var_e);
+                                                                        result->sym = !istempexpr($3) && $3->sym ? newtemp() : $3->sym;
+                                                                        
+                                                                        backpatch($3->truelist, nextquad());
+                                                                        backpatch($3->falselist, nextquad() + 2);
+                                                                        emit(assign, newexpr_constbool(true), nullptr, result, 0);
+                                                                        emit(jump, nullptr, nullptr, nullptr, nextquad() + 2);
+                                                                        emit(assign, newexpr_constbool(false), nullptr, result, 0);
+
+                                                                }
+                                                                
                                                                 if ($1->type == tableitem_e) {
                                                                         emit(tablesetelem, $1, $1->index, $3, 0);
                                                                         $$ = emit_iftableitem($1);
@@ -469,6 +560,7 @@ assignexpr:     lvalue ASSIGN expr              {
                                                                         $$ = newexpr_tmpvar(assignexpr_e);
                                                                         emit(assign, $1, nullptr, $$, 0);
                                                                 }
+
                                                         }
 
                                                         fprintf(yyout, "[-] Reduced: assignexpr -> lvalue ASSIGN expr\n");
@@ -496,6 +588,7 @@ primary:lvalue                 {
                                                                 fprintf(yyout, "[-] Reduced: primary -> LEFT_PARENTHESIS funcdef RIGHT_PARENTHESIS\n");
                                                         }
         | const                 {
+                                        $$ = $1;
                                         fprintf(yyout, "[-] Reduced: primary -> const\n");
                                 }
         ;
@@ -607,7 +700,8 @@ member: lvalue DOT IDENTIFIER   {
                                                                 fprintf(yyout, "[-] Reduced: member -> lvalue LEFT_BRACKET expr RIGHT_BRACKET\n");
                                                         }
 
-        | call DOT IDENTIFIER                           {
+        | call DOT IDENTIFIER                           {       
+                                                                $$ = member_item($1, $3);
                                                                 fprintf(yyout, "[-] Reduced: member -> call DOT IDENTIFIER\n");
                                                         }
 
@@ -671,11 +765,25 @@ methodcall: DOUBLE_DOT IDENTIFIER LEFT_PARENTHESIS elist RIGHT_PARENTHESIS      
             ;
 
 elist: expr                     {       
+                                        if ($1->type == boolexpr_e) {
+                                                backpatch($1->truelist, nextquad());
+                                                backpatch($1->falselist, nextquad() + 2);
+                                                emit(assign, newexpr_constbool(true), nullptr, $1, 0);
+                                                emit(jump, nullptr, nullptr, nullptr, nextquad() + 2);
+                                                emit(assign, newexpr_constbool(false), nullptr, $1, 0);
+                                        }
                                         $$ = $1;
                                         fprintf(yyout, "[-] Reduced: elist -> expr\n");
                                 }
 
         | elist COMMA expr      {       
+                                        if ($3->type == boolexpr_e) {
+                                                backpatch($3->truelist, nextquad());
+                                                backpatch($3->falselist, nextquad() + 2);
+                                                emit(assign, newexpr_constbool(true), nullptr, $3, 0);
+                                                emit(jump, nullptr, nullptr, nullptr, nextquad() + 2);
+                                                emit(assign, newexpr_constbool(false), nullptr, $3, 0);
+                                        }
                                         $3->next = $1;
                                         $$ = $3;
                                         fprintf(yyout, "[-] Reduced: elist -> expr COMMA elist\n");
@@ -691,9 +799,10 @@ objectdef: LEFT_BRACKET elist RIGHT_BRACKET     {
                                                         expr* obj = newexpr(newtable_e);
                                                         obj->sym = newtemp();
                                                         emit(tablecreate, obj, nullptr, nullptr, 0);
-                                                        expr* curr = $2;
+                                                        expr* curr = reverse($2);
                                                         for (int i = 0; curr; curr = curr->next) {
-                                                                emit(tablesetelem, obj, newexpr_constnum(i++), $2, nextquad());
+                                                                
+                                                                emit(tablesetelem, obj, newexpr_constnum(i++), curr, 0);
                                                         }
                                                         $$ = obj;
                                                         fprintf(yyout, "[-] Reduced: objectdef -> LEFT_BRACKET elist RIGHT_BRACKET\n");
@@ -703,7 +812,8 @@ objectdef: LEFT_BRACKET elist RIGHT_BRACKET     {
                                                         expr* obj = newexpr(newtable_e);
                                                         obj->sym = newtemp();
                                                         emit(tablecreate, obj, nullptr, nullptr, nextquad());
-                                                        for (indexed* p = $2; p; p = p->next) {
+                                                        indexed* p = $2;
+                                                        for (int i = 0; p; p = p->next) {
                                                                 emit(tablesetelem, obj, p->index, p->value, 0);
                                                         }
                                                         $$ = obj;
@@ -716,14 +826,28 @@ indexed: indexedelem                            {
                                                         fprintf(yyout, "[-] Reduced: indexed -> indexedelem\n");
                                                 }
 
-        | indexed COMMA indexedelem             {
-                                                        $3->next = $1;
-                                                        $$ = $3;
+        | indexedelem COMMA indexed            {
+                                                        $1->next = $3;
+                                                        $$ = $1;
                                                         fprintf(yyout, "[-] Reduced: indexed -> indexed COMMA indexedelem\n");
                                                 }
         ;
 
-indexedelem: LEFT_BRACE expr COLON expr RIGHT_BRACE     {
+indexedelem: LEFT_BRACE expr COLON expr RIGHT_BRACE     {       
+                                                                if ($2->type == boolexpr_e) {
+                                                                        backpatch($2->truelist, nextquad());
+                                                                        backpatch($2->falselist, nextquad() + 2);
+                                                                        emit(assign, newexpr_constbool(true), nullptr, $2, 0);
+                                                                        emit(jump, nullptr, nullptr, nullptr, nextquad() + 2);
+                                                                        emit(assign, newexpr_constbool(false), nullptr, $2, 0);
+                                                                }
+                                                                if ($4->type == boolexpr_e) {
+                                                                        backpatch($4->truelist, nextquad());
+                                                                        backpatch($4->falselist, nextquad() + 2);
+                                                                        emit(assign, newexpr_constbool(true), nullptr, $4, 0);
+                                                                        emit(jump, nullptr, nullptr, nullptr, nextquad() + 2);
+                                                                        emit(assign, newexpr_constbool(false), nullptr, $4, 0);
+                                                                }
                                                                 indexed* i = new indexed;
                                                                 i->index = $2;
                                                                 i->value = $4;
@@ -771,7 +895,6 @@ funcname: IDENTIFIER            {
         ;
 
 funcprefix: FUNCTION funcname   {       
-                                        fprintf(yyout, "                                                                                [-] hi nigga\n");
                                         SymEntry *found = symTable.lookup($2, 0);
 
                                         if(found && found->type == LIBFUNC) {
@@ -794,7 +917,7 @@ funcprefix: FUNCTION funcname   {
 
                                                         $$ = symTable.lookup($2, symTable.getScope());
                                                         $$->iaddress = nextquad();
-                                                        jumpfunctag = nextquad();
+                                                        jumpfunctag.push(nextquad());
                                                         emit(jump, nullptr, nullptr, nullptr, 0);
                                                         emit(funcstart, lvalue_expr($$), nullptr, nullptr, 0);
                                                         symTable.scopeOffsetStack.push(symTable.currScopeOffset());
@@ -855,7 +978,10 @@ funcdef: funcprefix funcargs funcblockstart funcbody funcblockend {
                                                         returns.pop();
                                                 }
                                                 emit(funcend, lvalue_expr($1), nullptr, nullptr, 0);
-                                                patchlabel(jumpfunctag, nextquad());
+                                                if (!jumpfunctag.empty()) {
+                                                        patchlabel(jumpfunctag.top(), nextquad());
+                                                        jumpfunctag.pop();
+                                                }
 
                                         }
         
@@ -970,6 +1096,13 @@ idlist: IDENTIFIER      {
         ;
 
 ifprefix: IF LEFT_PARENTHESIS expr RIGHT_PARENTHESIS    {
+                                                                if ($3->type == boolexpr_e) {
+                                                                        backpatch($3->truelist, nextquad());
+                                                                        backpatch($3->falselist, nextquad() + 2);
+                                                                        emit(assign, newexpr_constbool(true), nullptr, $3, 0);
+                                                                        emit(jump, nullptr, nullptr, nullptr, nextquad() + 2);
+                                                                        emit(assign, newexpr_constbool(false), nullptr, $3, 0);
+                                                                }
                                                                 emit(if_eq, $3, newexpr_constbool(true), nullptr, nextquad() + 2);
                                                                 $$ = nextquad();
                                                                 emit(jump, nullptr, nullptr, nullptr, 0);    
@@ -1017,7 +1150,15 @@ whilestart: WHILE       {
                                 $$ = nextquad();
                         }
 
-whilecond: LEFT_PARENTHESIS expr RIGHT_PARENTHESIS      {
+whilecond: LEFT_PARENTHESIS expr RIGHT_PARENTHESIS      {       
+                                                                if ($2->type == boolexpr_e) {
+
+                                                                        backpatch($2->truelist, nextquad());
+                                                                        backpatch($2->falselist, nextquad() + 2);
+                                                                        emit(assign, newexpr_constbool(true), nullptr, $2, 0);
+                                                                        emit(jump, nullptr, nullptr, nullptr, nextquad() + 2);
+                                                                        emit(assign, newexpr_constbool(false), nullptr, $2, 0);
+                                                                }
                                                                 emit(if_eq, $2, newexpr_constbool(true), nullptr, nextquad() + 2);
                                                                 $$ = nextquad();
                                                                 emit(jump, nullptr, nullptr, nullptr, 0);
@@ -1026,9 +1167,9 @@ whilecond: LEFT_PARENTHESIS expr RIGHT_PARENTHESIS      {
 
 whilestmt: whilestart whilecond loopstmt    {
                                                 emit(jump, nullptr, nullptr, nullptr, $1);
-                                                patchlabel($2, nextquad());     
+                                                patchlabel($2, nextquad());
                                                 patchlist($3->breaklist, nextquad());
-                                                patchlist($3->contlist, nextquad());
+                                                patchlist($3->contlist, $1);
                                                 fprintf(yyout, "[-] Reduced: whilestmt -> WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt\n");
                                         }
         ;
@@ -1048,7 +1189,14 @@ forprefix: FOR LEFT_PARENTHESIS  elist SEMICOLON M expr SEMICOLON       {
                                                                                 $$ = new struct forprefix;
                                                                                 $$->test = $5;
                                                                                 $$->enter = nextquad();
+                                                                                if ($3->type == boolexpr_e) {                                                                                        
+                                                                                        backpatch($3->truelist, nextquad());
+                                                                                        backpatch($3->falselist, nextquad() + 2);
+                                                                                        emit(assign, newexpr_constbool(true), nullptr, $3, 0);
+                                                                                        emit(jump, nullptr, nullptr, nullptr, nextquad() + 2);
+                                                                                        emit(assign, newexpr_constbool(false), nullptr, $3, 0);
 
+                                                                                }
                                                                                 emit(if_eq, $6, newexpr_constbool(true), nullptr, 0);
                                                                         }
 ;
@@ -1094,6 +1242,13 @@ returnstmt: RETURN expr SEMICOLON       {
                                                 if (symTable.funcStack.empty()) {
                                                         fprintf(yyout, "      [!] Error: Return statement outside function in line %d.\n", yylineno);
                                                 } else {
+                                                        if ($2->type == boolexpr_e) {
+                                                                backpatch($2->truelist, nextquad());
+                                                                backpatch($2->falselist, nextquad() + 2);
+                                                                emit(assign, newexpr_constbool(true), nullptr, $2, 0);
+                                                                emit(jump, nullptr, nullptr, nullptr, nextquad() + 2);
+                                                                emit(assign, newexpr_constbool(false), nullptr, $2, 0);
+                                                        }
                                                         emit(getretval, nullptr, nullptr, $2, 0);
                                                         returns.top().push(nextquad());
                                                         emit(jump, nullptr, nullptr, nullptr, 0);

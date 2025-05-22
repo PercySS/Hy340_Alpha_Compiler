@@ -61,6 +61,6 @@ $(SCANNER_CPP) $(SCANNER_HPP): $(SCANNER_L)
 
 # Clean up
 clean:
-	rm -rf $(OUT_DIR) $(TARGET)
+	rm -rf $(OUT_DIR) $(TARGET) quads.txt
 
 .PHONY: all clean

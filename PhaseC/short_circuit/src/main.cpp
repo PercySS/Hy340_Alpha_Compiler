@@ -70,11 +70,21 @@ int main(int argc, char** argv) {
         printf("Parsing failed.\n");
     }
     
-    print_quads(output);
-    /* // Print the symbol table
-    symTable.printTable(output); */
-
-    // Print the quads
+    // open file quads.txt for writing if it doesn't exist i create it 
+    FILE* quadsFile = fopen("quads.txt", "w");
+    if (!quadsFile) {
+        printf("Error: Could not open quads.txt for writing\n");
+        fclose(input);
+        if (argc == 3) {
+            fclose(outputFile);
+        }
+        return 1;
+    }
+    // Print the quads to the file
+    print_quads(quadsFile);
+    fclose(quadsFile);
+    
+    symTable.printTable(yyout);
 
     // Close the input and output files
     fclose(input);

@@ -4,9 +4,11 @@
 #include "../include/symtable.hpp"
 #include "../include/types.hpp"
 #include "../include/temp.hpp"
+#include "../include/backpatch.hpp"
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <cmath>
 
 extern int yylineno;
 extern FILE* yyout;
@@ -32,7 +34,7 @@ void emit(iopcode op, expr* arg1, expr* arg2, expr* result, int label) {
     q->label  = label;
     q->line   = yylineno;
     quads.push_back(q);
-    quad_counter++;
+    ++quad_counter;
 }
 
 unsigned nextquad() {
@@ -42,6 +44,13 @@ unsigned nextquad() {
 void patchlabel(unsigned quadNo, unsigned label) {
     assert(quadNo < quad_counter);
     quads[quadNo]->label = label;
+}
+
+std::string double_to_string(double d) {
+    if (d == floor(d)) {
+        return std::to_string((int)d);
+    }
+    return std::to_string(d);
 }
 
 static std::string exprToString(expr* e) {
@@ -58,7 +67,7 @@ static std::string exprToString(expr* e) {
         return e->sym ? e->sym->name : "_";
 
       case constnum_e:
-        return std::to_string(e->numConst);
+        return double_to_string(e->numConst);
 
       case constbool_e:
         return e->boolConst ? "true" : "false";
@@ -96,7 +105,32 @@ bool has_jump(iopcode op) {
            op == if_less || op == if_greater;
 }
 
+void optimize_jumps() {
+    std::stack<unsigned int> jumpStack = std::stack<unsigned int>();
+    unsigned int lastJump = 0;
+    fprintf(stdout, "Optimizing jumps...\n");
+    for (unsigned i = 0; i < quads.size(); i++) {
+        quad* q = quads[i];
+        if (q->op != jump)  continue;
+        while (q->op == jump) {
+            if (q->label >= quads.size()) {
+                lastJump = q->label;
+                break;
+            }
+            jumpStack.push(i);
+            lastJump = q->label;
+            q = quads[q->label];
+        }
+
+        while (!jumpStack.empty()) {
+            quads[jumpStack.top()]->label = lastJump;
+            jumpStack.pop();
+        }
+    }
+}
+
 void print_quads(FILE* out) {
+    /* optimize_jumps(); */
     fprintf(out, "\n============================================== QUADS =============================================\n");
     fprintf(out, "%-6s | %-12s | %-20s | %-20s | %-20s | %-6s\n",
             "Quad#","Opcode","Result","Arg1","Arg2","Label");
@@ -111,9 +145,9 @@ void print_quads(FILE* out) {
                 exprToString(q->result).c_str(),
                 exprToString(q->arg1).c_str(),
                 exprToString(q->arg2).c_str());
-
-        has_jump(q->op) ? fprintf(out, "%-6u", q->label + 1) :
-                          fprintf(out, "      ");
+        has_jump(q->op) ?
+            fprintf(out, "%-6u", q->label + 1) :
+            fprintf(out, "%-6s", " ");
         fprintf(out, "  {line %d}", q->line);
         fprintf(out, "\n");
 
@@ -132,14 +166,22 @@ expr* emit_arith(iopcode op, expr* arg1, expr* arg2, expr* result) {
         comperror("Division by zero", "division/modulus");
         exit(1);
     }
-    result     = newexpr(arithexpr_e);
-    result->sym = newtemp();
+
+    result = newexpr(arithexpr_e);
+
+    if (!check_constexpr(arg1) && istempexpr(arg1)) {
+        result->sym = arg1->sym;
+    } else if (!check_constexpr(arg2) && istempexpr(arg2)) {
+        result->sym = arg2->sym;
+    } else {
+        result->sym = newtemp();
+    }
     
     emit(op, arg1, arg2, result, 0);
     return result;
 }
 
-expr* emit_eq(iopcode op, expr* arg1, expr* arg2, expr* result) {
+void checkforeqop(expr* arg1, expr* arg2) {
     bool same_non_nil =
         arg1->type == arg2->type 
      && arg1->type != nil_e;
@@ -155,32 +197,11 @@ expr* emit_eq(iopcode op, expr* arg1, expr* arg2, expr* result) {
           yylineno);
         exit(1);
     }
-
-    result       = newexpr(boolexpr_e);
-    result->sym  = newtemp();
-
-
-    if (table_nil_pair) {
-        // table == nil → always false; table != nil → always true
-        expr* c = newexpr_constbool(op == if_noteq);
-        emit(assign, c, nullptr, result, nextquad());
-        return result;
-    }
-
-    emit(op, arg1, arg2, result, nextquad() + 3);
-    emit(assign, newexpr_constbool(false), nullptr, result, 0);
-    emit(jump,   nullptr, nullptr, nullptr, nextquad() + 2);
-    emit(assign, newexpr_constbool(true), nullptr, result, 0);
-
-    return result;
 }
 
 
 
 expr* emit_relop(iopcode op, expr* arg1, expr* arg2, expr* result) {
-    if (op == if_eq || op == if_noteq) {
-        return emit_eq(op, arg1, arg2, result);
-    }
     if (!check_arith(arg1, "first operand") ||
         !check_arith(arg2, "second operand")) {
         exit(1);
@@ -190,11 +211,12 @@ expr* emit_relop(iopcode op, expr* arg1, expr* arg2, expr* result) {
     else if (op == if_greater)   result->boolConst = arg1->numConst >   arg2->numConst;
     else if (op == if_lesseq)    result->boolConst = arg1->numConst <=  arg2->numConst;
     else if (op == if_greatereq) result->boolConst = arg1->numConst >=  arg2->numConst;
+
     result->sym = newtemp();
-    emit(op, arg1, arg2, result, nextquad() + 3);
-    emit(assign, newexpr_constbool(false), nullptr, result, 0);
-    emit(jump,   nullptr, nullptr, nullptr, nextquad() + 2);
-    emit(assign, newexpr_constbool(true), nullptr, result, 0);
+    emit(op, arg1, arg2, result, 0);
+    result->truelist = makelist(nextquad() - 1);
+    emit(jump, nullptr, nullptr, nullptr, 0);
+    result->falselist = makelist(nextquad() - 1);
     return result;
 }
 

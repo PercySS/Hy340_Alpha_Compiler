@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <cmath>
 
 extern int yylineno;
 extern FILE* yyout;
@@ -44,6 +45,13 @@ void patchlabel(unsigned quadNo, unsigned label) {
     quads[quadNo]->label = label;
 }
 
+std::string double_to_string(double d) {
+    if (d == floor(d)) {
+        return std::to_string((int)d);
+    }
+    return std::to_string(d);
+}
+
 static std::string exprToString(expr* e) {
     if (!e) return "_";
 
@@ -58,7 +66,7 @@ static std::string exprToString(expr* e) {
         return e->sym ? e->sym->name : "_";
 
       case constnum_e:
-        return std::to_string(e->numConst);
+        return double_to_string(e->numConst);
 
       case constbool_e:
         return e->boolConst ? "true" : "false";
@@ -96,7 +104,32 @@ bool has_jump(iopcode op) {
            op == if_less || op == if_greater;
 }
 
+void optimize_jumps() {
+    std::stack<unsigned int> jumpStack = std::stack<unsigned int>();
+    unsigned int lastJump = 0;
+    fprintf(stdout, "Optimizing jumps...\n");
+    for (unsigned i = 0; i < quads.size(); i++) {
+        quad* q = quads[i];
+        if (q->op != jump)  continue;
+        while (q->op == jump) {
+            if (q->label >= quads.size()) {
+                lastJump = q->label;
+                break;
+            }
+            jumpStack.push(i);
+            lastJump = q->label;
+            q = quads[q->label];
+        }
+
+        while (!jumpStack.empty()) {
+            quads[jumpStack.top()]->label = lastJump;
+            jumpStack.pop();
+        }
+    }
+}
+
 void print_quads(FILE* out) {
+    optimize_jumps();
     fprintf(out, "\n============================================== QUADS =============================================\n");
     fprintf(out, "%-6s | %-12s | %-20s | %-20s | %-20s | %-6s\n",
             "Quad#","Opcode","Result","Arg1","Arg2","Label");
@@ -132,8 +165,16 @@ expr* emit_arith(iopcode op, expr* arg1, expr* arg2, expr* result) {
         comperror("Division by zero", "division/modulus");
         exit(1);
     }
-    result     = newexpr(arithexpr_e);
-    result->sym = newtemp();
+
+    result = newexpr(arithexpr_e);
+
+    if (!check_constexpr(arg1) && istempexpr(arg1)) {
+        result->sym = arg1->sym;
+    } else if (!check_constexpr(arg2) && istempexpr(arg2)) {
+        result->sym = arg2->sym;
+    } else {
+        result->sym = newtemp();
+    }
     
     emit(op, arg1, arg2, result, 0);
     return result;

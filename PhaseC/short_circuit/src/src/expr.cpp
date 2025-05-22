@@ -81,6 +81,17 @@ expr* emit_iftableitem(expr* e) {
     }
 }
 
+expr* reverse(expr* head) {
+  expr* prev = nullptr;
+  while (head) {
+    expr* nxt = head->next;
+    head->next = prev;
+    prev = head;
+    head = nxt;
+  }
+  return prev;
+}
+
 expr* make_call(expr* lv, expr* reversed_list) {
     expr* func = emit_iftableitem(lv);
     while (reversed_list) {
@@ -110,6 +121,15 @@ bool check_arith(expr* e, std::string context) {
     return true;
 }
 
+bool check_constexpr(expr* e) {
+    if (e->type == constnum_e ||
+        e->type == constbool_e ||
+        e->type == conststring_e) {
+        return true;
+    }
+    return false;
+}
+
 void comperror(const char* msg, const char* context) {
     extern FILE* yyout;
     extern int   yylineno;
@@ -123,23 +143,9 @@ unsigned int istempname(const std::string& name) {
 }
 
 unsigned int istempexpr(expr* e) {
-    return e->type == var_e && istempname(e->sym->name);
+    return istempname(e->sym->name);
 }
 
-expr* convert_to_bool(expr* e) {
-    if (e->type == constbool_e) {
-        return e;
-    } else if (e->type == constnum_e) {
-        return newexpr_constbool(e->numConst != 0);
-    } else if (e->type == conststring_e) {
-        return newexpr_constbool(e->strConst != "");
-    } else if (e->type == nil_e) {
-        return newexpr_constbool(false);
-    } else if (e->type == newtable_e) {
-        return newexpr_constbool(true);
-    } else if (e->type == programfunc_e || e->type == libraryfunc_e) {
-        return newexpr_constbool(true);
-    } else {
-        return e;
-    }
-}
+
+
+

@@ -33,7 +33,7 @@ int yyerror(const char* msg);
 
 // Global variables
 SymEntry* entryFuncDef = nullptr;
-unsigned int jumpfunctag;
+std::stack<unsigned int> jumpfunctag = std::stack<unsigned int>();
 unsigned int jumpfromreturntag;
 std::stack<std::stack<unsigned int>> returns = std::stack<std::stack<unsigned int>>();
 
@@ -163,16 +163,17 @@ program: stmt_list      {
         ;
 
 stmt: expr SEMICOLON    {       
-                                resettemp();
                                 $$ = new struct stmt_t;
                                 make_stmt($$);
+                                resettemp();
                                 fprintf(yyout, "[-] Reduced: stmt -> expr SEMICOLON\n");
                         }
 
         | ifstmt        {       
-                                resettemp();
+                                
                                 $$ = new struct stmt_t;
                                 make_stmt($$);
+                                resettemp();
                                 fprintf(yyout, "[-] Reduced: stmt -> ifstmt\n");
                         }
 
@@ -607,7 +608,8 @@ member: lvalue DOT IDENTIFIER   {
                                                                 fprintf(yyout, "[-] Reduced: member -> lvalue LEFT_BRACKET expr RIGHT_BRACKET\n");
                                                         }
 
-        | call DOT IDENTIFIER                           {
+        | call DOT IDENTIFIER                           {       
+                                                                $$ = member_item($1, $3);
                                                                 fprintf(yyout, "[-] Reduced: member -> call DOT IDENTIFIER\n");
                                                         }
 
@@ -691,9 +693,10 @@ objectdef: LEFT_BRACKET elist RIGHT_BRACKET     {
                                                         expr* obj = newexpr(newtable_e);
                                                         obj->sym = newtemp();
                                                         emit(tablecreate, obj, nullptr, nullptr, 0);
-                                                        expr* curr = $2;
+                                                        expr* curr = reverse($2);
                                                         for (int i = 0; curr; curr = curr->next) {
-                                                                emit(tablesetelem, obj, newexpr_constnum(i++), $2, nextquad());
+                                                                
+                                                                emit(tablesetelem, obj, newexpr_constnum(i++), curr, 0);
                                                         }
                                                         $$ = obj;
                                                         fprintf(yyout, "[-] Reduced: objectdef -> LEFT_BRACKET elist RIGHT_BRACKET\n");
@@ -703,7 +706,8 @@ objectdef: LEFT_BRACKET elist RIGHT_BRACKET     {
                                                         expr* obj = newexpr(newtable_e);
                                                         obj->sym = newtemp();
                                                         emit(tablecreate, obj, nullptr, nullptr, nextquad());
-                                                        for (indexed* p = $2; p; p = p->next) {
+                                                        indexed* p = $2;
+                                                        for (int i = 0; p; p = p->next) {
                                                                 emit(tablesetelem, obj, p->index, p->value, 0);
                                                         }
                                                         $$ = obj;
@@ -716,9 +720,9 @@ indexed: indexedelem                            {
                                                         fprintf(yyout, "[-] Reduced: indexed -> indexedelem\n");
                                                 }
 
-        | indexed COMMA indexedelem             {
-                                                        $3->next = $1;
-                                                        $$ = $3;
+        | indexedelem COMMA indexed            {
+                                                        $1->next = $3;
+                                                        $$ = $1;
                                                         fprintf(yyout, "[-] Reduced: indexed -> indexed COMMA indexedelem\n");
                                                 }
         ;
@@ -794,7 +798,7 @@ funcprefix: FUNCTION funcname   {
 
                                                         $$ = symTable.lookup($2, symTable.getScope());
                                                         $$->iaddress = nextquad();
-                                                        jumpfunctag = nextquad();
+                                                        jumpfunctag.push(nextquad());
                                                         emit(jump, nullptr, nullptr, nullptr, 0);
                                                         emit(funcstart, lvalue_expr($$), nullptr, nullptr, 0);
                                                         symTable.scopeOffsetStack.push(symTable.currScopeOffset());
@@ -855,7 +859,10 @@ funcdef: funcprefix funcargs funcblockstart funcbody funcblockend {
                                                         returns.pop();
                                                 }
                                                 emit(funcend, lvalue_expr($1), nullptr, nullptr, 0);
-                                                patchlabel(jumpfunctag, nextquad());
+                                                if (!jumpfunctag.empty()) {
+                                                        patchlabel(jumpfunctag.top(), nextquad());
+                                                        jumpfunctag.pop();
+                                                }
 
                                         }
         
@@ -1028,7 +1035,7 @@ whilestmt: whilestart whilecond loopstmt    {
                                                 emit(jump, nullptr, nullptr, nullptr, $1);
                                                 patchlabel($2, nextquad());     
                                                 patchlist($3->breaklist, nextquad());
-                                                patchlist($3->contlist, nextquad());
+                                                patchlist($3->contlist, $1);
                                                 fprintf(yyout, "[-] Reduced: whilestmt -> WHILE LEFT_PARENTHESIS expr RIGHT_PARENTHESIS stmt\n");
                                         }
         ;

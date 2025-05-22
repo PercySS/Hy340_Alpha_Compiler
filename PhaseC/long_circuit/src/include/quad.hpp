@@ -21,7 +21,9 @@ void    init_quads();
 void    emit(iopcode op, expr* arg1, expr* arg2, expr* result, int label = 0);
 expr* emit_iftableitem(expr* e);
 unsigned nextquad();
+void optimize_jumps();
 void    print_quads(FILE* output);
+
 
 // convenience emitters
 expr* emit_arith(iopcode op, expr* a1, expr* a2, expr* res);
