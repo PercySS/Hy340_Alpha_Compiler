@@ -1281,7 +1281,7 @@ returnstmt: RETURN expr SEMICOLON       {
                                                                 emit(jump, nullptr, nullptr, nullptr, nextquad() + 2);
                                                                 emit(assign, newexpr_constbool(false), nullptr, $2, 0);
                                                         }
-                                                        emit(getretval, nullptr, nullptr, $2, 0);
+                                                        emit(ret, nullptr, nullptr, $2, 0);
                                                         returns.top().push(nextquad());
                                                         emit(jump, nullptr, nullptr, nullptr, 0);
                                                 }
@@ -1291,7 +1291,7 @@ returnstmt: RETURN expr SEMICOLON       {
                                                 if (symTable.funcStack.empty()) {
                                                         fprintf(yyout, "      [!] Error: Return statement outside function in line %d.\n", yylineno);
                                                 } else {
-                                                        emit(getretval, nullptr, nullptr, nullptr, 0);
+                                                        emit(ret, nullptr, nullptr, nullptr, 0);
                                                         returns.top().push(nextquad());
                                                         emit(jump, nullptr, nullptr, nullptr, 0);
                                                 }

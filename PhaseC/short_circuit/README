@@ -1,0 +1,17 @@
+Phase three HY340 compilers:
+- Dimitrios Makrogiannis 4676
+- Katerina Gyparaki 4621
+- Kalliopi Samaritaki 5140
+
+
+We have implemented all the long circuit version of the compiler.
+The short circuit only lacks in for loops maybe.
+
+option: 
+  remove from comment line 133 of src/src/quad.cpp in order to have optimized jumps.
+
+Runs in portokali with the following command (genrates quads.txt by itself):
+- make clean 
+- make 
+./compiler inputfile outputfile[optional] 
+
