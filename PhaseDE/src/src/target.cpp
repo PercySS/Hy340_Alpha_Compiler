@@ -1,5 +1,4 @@
 #include "../include/target.hpp"
-#define MAGIC_NUMBER 0xDEADBEEF
 
 extern std::vector<quad*> quads;
 std::vector<double> numConsts;
@@ -10,7 +9,6 @@ std::vector<instruction> instructions;
 std::vector<incomplete_jump> jumps;
 unsigned currProcessedQuad = 0;
 std::stack<unsigned> funcs;
-
 
 void add_incomplete_jump(unsigned instr, unsigned iaddress) {
     incomplete_jump ij = {instr, iaddress};
@@ -60,7 +58,7 @@ unsigned userfuncs_newfunc(SymEntry* u) {
 }
 
 unsigned libfuncs_newused(std::string s) {
-    for (unsigned i = 0; i < namedLibFuncs.size(); ++i) {
+    for (unsigned i = 0; i < namedLibFuncs.size(); i++) {
         if (namedLibFuncs[i] == s)
             return i;
     }
@@ -70,9 +68,11 @@ unsigned libfuncs_newused(std::string s) {
 
 void make_operand(expr* e, vmarg* arg) {
     if (!e) {
-        reset_operand(arg);
+        if (!arg) return;
+        arg->type = nil_a;
         return;
     }
+
 
     switch (e->type) {
       case var_e:
@@ -92,28 +92,27 @@ void make_operand(expr* e, vmarg* arg) {
         break;
 
       case constbool_e:
+        arg->val  = e->boolConst;
         arg->type = bool_a;
-        arg->val  = e->boolConst ? 1 : 0;
         break;
 
       case constnum_e:
-        arg->type = number_a;
         arg->val  = consts_newnum(e->numConst);
+        arg->type = number_a;
         break;
 
       case conststring_e:
-        arg->type = string_a;
         arg->val  = consts_newstring(e->strConst);
+        arg->type = string_a;
         break;
 
       case nil_e:
-        reset_operand(arg);
+        arg->type = nil_a;
         break;
 
-      case programfunc_e:  // or userfunc_e in your enum
-        assert(e->sym);
+      case programfunc_e:
         arg->type = userfunc_a;
-        arg->val  = e->sym->taddress;
+        arg->val  = userfuncs_newfunc(e->sym);
         break;
 
       case libraryfunc_e:
@@ -128,18 +127,17 @@ void make_operand(expr* e, vmarg* arg) {
 
 
 void make_numberoperand(vmarg* arg, double n) {
-    arg->type = number_a;
     arg->val = consts_newnum(n);
+    arg->type = number_a;
 }
 
 void make_booloperand(vmarg* arg, std::string s) {
-    arg->type = bool_a;
     arg->val = (s == "true") ? 1 : 0;
+    arg->type = bool_a;
 }
 
 void make_retvaloperand(vmarg* arg) {
     arg->type = retval_a;
-    arg->val = 0;
 }
 
 void emit(instruction t) {
@@ -182,16 +180,6 @@ void generate_nop(quad* quad) {
     emit(t);
 }
 
-void generate_uminus(quad* quad) {
-    instruction t{};
-    t.opcode = uminus_v;
-    make_operand(quad->arg1, &t.arg1);
-    make_operand(quad->result, &t.result);
-    quad->taddress = nextinstructionlabel();
-    t.srcLine = quad->line;
-    emit(t);
-}
-
 void generate_relational(vmopcode op, quad* quad) {
     instruction t{};
     t.opcode = op;
@@ -217,104 +205,6 @@ void generate_ifge(quad* quad) {generate_relational(jge_v, quad);}
 void generate_iflt(quad* quad) {generate_relational(jlt_v, quad);}
 void generate_ifgt(quad* quad) {generate_relational(jgt_v, quad);}
 
-void generate_not(quad* quad) {
-    quad->taddress = nextinstructionlabel();
-    instruction t{};
-    t.opcode = jeq_v;
-    make_operand(quad->arg1, &t.arg1);
-    make_booloperand(&t.arg2, "false");
-    t.result.type = label_a;
-    t.result.val = nextinstructionlabel() + 3; // Jump to the next instruction after the not
-    emit(t);
-
-    t.opcode = assign_v;
-    make_booloperand(&t.arg1, "false");
-    reset_operand(&t.arg2);
-    make_operand(quad->result, &t.result);
-    emit(t);
-
-    t.opcode = jump_v;
-    reset_operand(&t.arg1);
-    reset_operand(&t.arg2);
-    t.result.type = label_a;
-    t.result.val = nextinstructionlabel() + 2; // Jump to the end of the not
-    emit(t);
-
-    t.opcode = assign_v;
-    make_booloperand(&t.arg1, "true");
-    reset_operand(&t.arg2);
-    make_operand(quad->result, &t.result);
-    emit(t);
-}
-
-void generate_or(quad* quad) {
-    quad->taddress = nextinstructionlabel();
-    instruction t{};
-    
-    t.opcode = jeq_v;
-    make_operand(quad->arg1, &t.arg1);
-    make_booloperand(&t.arg2, "true");
-    t.result.type = label_a;
-    t.result.val = nextinstructionlabel() + 4;
-    emit(t);
-    
-    make_operand(quad->arg2, &t.arg1);
-    t.result.val = nextinstructionlabel() + 3;
-    
-    t.opcode = assign_v;
-    make_booloperand(&t.arg1, "false");
-    reset_operand(&t.arg2);
-    make_operand(quad->result, &t.result);
-    emit(t);
-
-    t.opcode = jump_v;
-    reset_operand(&t.arg1);
-    reset_operand(&t.arg2);
-    t.result.type = label_a;
-    t.result.val = nextinstructionlabel() + 2; // Jump to the end of the or
-    emit(t);
-
-    t.opcode = assign_v;
-    make_booloperand(&t.arg1, "true");
-    reset_operand(&t.arg2);
-    make_operand(quad->result, &t.result);
-    emit(t);
-}
-
-void generate_and(quad* quad) {
-    quad->taddress = nextinstructionlabel();
-    instruction t{};
-    
-    t.opcode = jeq_v;
-    make_operand(quad->arg1, &t.arg1);
-    make_booloperand(&t.arg2, "false");
-    t.result.type = label_a;
-    t.result.val = nextinstructionlabel() + 4; // Jump to the end if arg1 is false
-    emit(t);
-    
-    make_operand(quad->arg2, &t.arg1);
-    t.result.val = nextinstructionlabel() + 3; // Jump to the next instruction after arg2
-
-    t.opcode = assign_v;
-    make_booloperand(&t.arg1, "true");
-    reset_operand(&t.arg2);
-    make_operand(quad->result, &t.result);
-    emit(t);
-
-    t.opcode = jump_v;
-    reset_operand(&t.arg1);
-    reset_operand(&t.arg2);
-    t.result.type = label_a;
-    t.result.val = nextinstructionlabel() + 2; // Jump to the end of the and
-    emit(t);
-
-    t.opcode = assign_v;
-    make_booloperand(&t.arg1, "false");
-    reset_operand(&t.arg2);
-    make_operand(quad->result, &t.result);
-    emit(t);
-}
-
 void generate_param(quad* quad) {
     quad->taddress = nextinstructionlabel();
     instruction t{};
@@ -327,8 +217,10 @@ void generate_call(quad* quad) {
     quad->taddress = nextinstructionlabel();
     instruction t{};
     t.opcode = call_v;
-    make_operand(quad->result, &t.result);    
-    reset_operand(&t.arg2);
+    std::cout << "[generate_call] quad->arg1 expr type = " << quad->arg1->type << "\n";
+    if (quad->arg1->sym)
+        std::cout << "[generate_call] sym name: " << quad->arg1->sym->name << ", sym type: " << quad->arg1->sym->type << "\n";
+    make_operand(quad->arg1, &t.result);
     emit(t);
 }
 
@@ -336,42 +228,33 @@ void generate_getretval(quad* quad) {
     quad->taddress = nextinstructionlabel();
     instruction t{};
     t.opcode = getretval_v;
-    make_retvaloperand(&t.result);
-    reset_operand(&t.arg1);
-    reset_operand(&t.arg2);
+    make_operand(quad->result, &t.result);
     emit(t);
 }
 
 
 void generate_funcstart(quad* q) {    
-    q->taddress = nextinstructionlabel();
-    unsigned funcIndex = userfuncs_newfunc(q->arg1->sym);
-    q->arg1->sym->taddress = funcIndex;
-    funcs.push(funcIndex);
-    
-    instruction instr;
-    instr.opcode  = funcenter_v;
-    make_operand(q->arg1, &instr.result);  
-    instr.srcLine = q->line;
-    emit(instr);
+  q->taddress = nextinstructionlabel();
+  q->arg1->sym->taddress = q->taddress; // set function address
+
+  instruction t{};
+  t.opcode = funcenter_v;
+  funcs.push(q->taddress);
+  make_operand(q->arg1, &t.result);
+  emit(t);
 }
 
 void generate_funcend(quad* quad) {
     quad->taddress = nextinstructionlabel();
     instruction t{};
-    userfunc uf = userFuncs[funcs.top()];
-    funcs.pop();
-    uf.id = quad->arg1->sym->name;
-    uf.address = nextinstructionlabel();
-    uf.localSize = quad->arg1->sym->totalLocals;
-    userfuncs_newfunc(quad->arg1->sym);
+    userfunc f;
+    f.id = quad->arg1->sym->name;
+    f.localSize = quad->arg1->sym->totalLocals;
     t.opcode = funcexit_v;
+
     make_operand(quad->arg1, &t.result);
-    uf.address = t.result.val;
-    quad->arg1->sym->taddress = uf.address; // Update the taddress in the symbol table
-    t.srcLine = quad->line;
-    t.result.type = userfunc_a;
-    userFuncs.push_back(uf);
+    f.address = t.result.val;
+    userFuncs.push_back(f);
     emit(t);
 }
 
@@ -383,6 +266,22 @@ void generate_return(quad* quad) {
     make_retvaloperand(&t.result);
     make_operand(quad->arg1, &t.arg1);
     emit(t);
+}
+
+void generate_uminus(quad* quad) {
+    ;
+}
+
+void generate_and(quad* quad) {
+    ;
+}
+
+void generate_or(quad* quad) {
+    ;
+}
+
+void generate_not(quad* quad) {
+    ;
 }
 
 
@@ -423,10 +322,12 @@ static_assert(sizeof(generators)/sizeof(*generators) == 27,
 
 
 static const char *vmopcodeNames[] = {
-    "assign", "add",  "sub",  "mul",  "div",  "mod",  "uminus",
-    "and",    "or",   "not",  "jeq",  "jne",  "jle",  "jge",
-    "jlt",    "jgt",  "jump", "call", "pusharg", "return", "getretval", "funcenter","funcexit",
-    "newtable","tablegetelem","tablesetelem","nop"
+    "assign", "add",  "sub",  "mul",  "div",  "mod",  
+    "uminus", "and", "or", "not",
+    "jeq",  "jne",  "jle",  "jge", "jlt", "jgt",  
+    "jump", "call", "pusharg", "return", "getretval", 
+    "funcenter", "funcexit",
+    "newtable", "tablegetelem", "tablesetelem", "nop"
 };
 
 static std::string argToString(const vmarg &a) {
@@ -440,6 +341,7 @@ void generate_and_print_instructions() {
         q->taddress = 0;
     }
 
+    
     for (unsigned i = 0; i < quads.size(); ++i) {
         currProcessedQuad = i;
         quad *q = quads[i];
@@ -447,11 +349,10 @@ void generate_and_print_instructions() {
         if (gen) {
             gen(q);
         } else {
-            std::cerr << "Error: No generator for opcode " << q->op << " at quad index " << i << "\n";
+            std::cout << "Error: No generator for opcode " << q->op << " at quad index " << i << "\n";
             continue;
         }
     }
-
     patch_incomplete_jumps();
 
 
@@ -475,52 +376,83 @@ void generate_and_print_instructions() {
 }
 
 void write_binary(const std::string &fileName) {
-  std::ofstream out(fileName, std::ios::binary);
-  // 1) magic
-  uint32_t mag = MAGIC_NUMBER;
-  out.write((char*)&mag, sizeof(mag));
-  // 2) strings
-  uint32_t sc = stringConsts.size();
-  out.write((char*)&sc, sizeof(sc));
-  for (auto &s : stringConsts) {
-    uint32_t len = s.size();
-    out.write((char*)&len, sizeof(len));
-    out.write(s.c_str(), len+1);
-  }
-  // 3) numbers
-  uint32_t nc = numConsts.size();
-  out.write((char*)&nc, sizeof(nc));
-  for (double d : numConsts)
-    out.write((char*)&d, sizeof(d));
-  // 4) userfuncs
-  uint32_t uc = userFuncs.size();
-  out.write((char*)&uc, sizeof(uc));
-  for (auto &uf : userFuncs) {
-    out.write((char*)&uf.address,   sizeof(uf.address));
-    out.write((char*)&uf.localSize, sizeof(uf.localSize));
-    uint32_t l = uf.id.size();
-    out.write((char*)&l, sizeof(l));
-    out.write(uf.id.c_str(), l+1);
-  }
-  // 5) libfuncs
-  uint32_t lc = namedLibFuncs.size();
-  out.write((char*)&lc, sizeof(lc));
-  for (auto &lf : namedLibFuncs) {
-    uint32_t l = lf.size();
-    out.write((char*)&l, sizeof(l));
-    out.write(lf.c_str(), l+1);
-  }
-  // 6) code
-  uint32_t ic = instructions.size();
-  out.write((char*)&ic, sizeof(ic));
-  for (auto &ins : instructions) {
-    out.put((char)ins.opcode);
-    out.put((char)ins.result.type);
-    out.write((char*)&ins.result.val, sizeof(ins.result.val));
-    out.put((char)ins.arg1.type);
-    out.write((char*)&ins.arg1.val, sizeof(ins.arg1.val));
-    out.put((char)ins.arg2.type);
-    out.write((char*)&ins.arg2.val, sizeof(ins.arg2.val));
-    // (omit srcLine—it’s only for debugging)
-  }
+    std::ofstream out(fileName, std::ios::binary);
+    std::ofstream txtOut(fileName + ".txt"); // HUMAN READABLE OUTPUT
+
+    // 1) magic
+    uint32_t mag = MAGIC_NUMBER;
+    out.write((char*)&mag, sizeof(mag));
+    txtOut << "[MAGIC] " << mag << std::endl; // HUMAN READABLE OUTPUT
+
+    // 2) strings
+    uint32_t sc = stringConsts.size();
+    out.write((char*)&sc, sizeof(sc));
+    txtOut << "[STRINGS COUNT] " << sc << std::endl; // HUMAN READABLE OUTPUT
+    for (auto &s : stringConsts) {
+        uint32_t len = s.size();
+        out.write((char*)&len, sizeof(len));
+        out.write(s.c_str(), len+1);
+
+        txtOut << "  [STRING LEN] " << len << " [VALUE] " << s << std::endl; // HUMAN READABLE OUTPUT
+    }
+
+    // 3) numbers
+    uint32_t nc = numConsts.size();
+    out.write((char*)&nc, sizeof(nc));
+    txtOut << "[NUMBERS COUNT] " << nc << std::endl; // HUMAN READABLE OUTPUT
+    for (double d : numConsts) {
+        out.write((char*)&d, sizeof(d));
+        txtOut << "  [NUMBER] " << d << std::endl; // HUMAN READABLE OUTPUT
+    }
+
+    // 4) userfuncs
+    uint32_t uc = userFuncs.size();
+    out.write((char*)&uc, sizeof(uc));
+    txtOut << "[USERFUNCS COUNT] " << uc << std::endl; // HUMAN READABLE OUTPUT
+    for (auto &uf : userFuncs) {
+        out.write((char*)&uf.address,   sizeof(uf.address));
+        out.write((char*)&uf.localSize, sizeof(uf.localSize));
+        uint32_t l = uf.id.size();
+        out.write((char*)&l, sizeof(l));
+        out.write(uf.id.c_str(), l+1);
+
+        txtOut << "  [USERFUNC] address: " << uf.address
+               << ", localSize: " << uf.localSize
+               << ", idLen: " << l
+               << ", id: " << uf.id << std::endl; // HUMAN READABLE OUTPUT
+    }
+
+    // 5) libfuncs
+    uint32_t lc = namedLibFuncs.size();
+    out.write((char*)&lc, sizeof(lc));
+    txtOut << "[LIBFUNCS COUNT] " << lc << std::endl; // HUMAN READABLE OUTPUT
+    for (auto &lf : namedLibFuncs) {
+        uint32_t l = lf.size();
+        out.write((char*)&l, sizeof(l));
+        out.write(lf.c_str(), l+1);
+
+        txtOut << "  [LIBFUNC LEN] " << l << " [NAME] " << lf << std::endl; // HUMAN READABLE OUTPUT
+    }
+
+    // 6) code
+    uint32_t ic = instructions.size();
+    out.write((char*)&ic, sizeof(ic));
+    txtOut << "[INSTRUCTIONS COUNT] " << ic << std::endl; // HUMAN READABLE OUTPUT
+    for (size_t i = 0; i < instructions.size(); ++i) {
+        auto &ins = instructions[i];
+        out.put((char)ins.opcode);
+        out.put((char)ins.result.type);
+        out.write((char*)&ins.result.val, sizeof(ins.result.val));
+        out.put((char)ins.arg1.type);
+        out.write((char*)&ins.arg1.val, sizeof(ins.arg1.val));
+        out.put((char)ins.arg2.type);
+        out.write((char*)&ins.arg2.val, sizeof(ins.arg2.val));
+        // (omit srcLine—it’s only for debugging)
+
+        txtOut << "  [INSTRUCTION " << i << "] opcode: " << (int)ins.opcode
+               << ", resultType: " << (int)ins.result.type << ", resultVal: " << ins.result.val
+               << ", arg1Type: " << (int)ins.arg1.type << ", arg1Val: " << ins.arg1.val
+               << ", arg2Type: " << (int)ins.arg2.type << ", arg2Val: " << ins.arg2.val
+               << std::endl; // HUMAN READABLE OUTPUT
+    }
 }

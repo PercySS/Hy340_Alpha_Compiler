@@ -98,6 +98,11 @@ expr* make_call(expr* lv, expr* reversed_list) {
         emit(param, reversed_list, nullptr, nullptr, 0);
         reversed_list = reversed_list->next;
     }
+
+    if (func && func->sym && func->sym->type == LIBFUNC) {
+        func->type = libraryfunc_e;
+    }
+    
     emit(call, func, nullptr, nullptr, 0);
 
     expr* result = newexpr(var_e);

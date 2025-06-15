@@ -1,108 +1,145 @@
-//=== avm.hpp ================================================================
-#ifndef AVM_HPP
-#define AVM_HPP
+#ifndef _AVM_HPP
+#define _AVM_HPP
 
-#include <cstdint>
-#include <string>
-#include <cassert>
 #include "target.hpp"
+#include <cstring>
+#include <cmath>
+#include <cassert>
 
+#define AVM_STACKSIZE 4096
+#define AVM_WIPEOUT(m) memset(&(m), 0, sizeof(m))
 #define AVM_TABLE_HASHSIZE 211
 #define AVM_STACKENV_SIZE 4
+#define AVM_ENDING_PC codeSize
+#define AVM_NUMACTUALS_OFFSET 4
+#define AVM_SAVEDPC_OFFSET 3
+#define AVM_SAVEDTOP_OFFSET 2
+#define AVM_SAVEDTOPSP_OFFSET 1
 
-//––– Memory‐cell types –––––––––––––––––––––––––––––––––––––––––––––––––––––
+#define execute_add execute_arithmetic
+#define execute_sub execute_arithmetic
+#define execute_mul execute_arithmetic
+#define execute_div execute_arithmetic
+#define execute_mod execute_arithmetic
+
 
 enum avm_memcell_t {
-    number_m, string_m, bool_m, table_m,
-    userfunc_m, libfunc_m, nil_m, undef_m
+    number_m   = 0,
+    string_m   = 1,
+    bool_m     = 2,
+    table_m    = 3,
+    userfunc_m = 4,
+    libfunc_m  = 5,
+    nil_m      = 6,
+    undef_m    = 7
 };
 
-/* Forward declare */
 struct avm_table;
-
-/* A generic VM “cell” holding a value */
 struct avm_memcell {
-    avm_memcell_t type;
+    avm_memcell_t  type;
     union {
-        double       numVal;
-        std::string* strVal;
-        bool         boolVal;
-        avm_table*   tableVal;
-        unsigned     funcVal;
-        unsigned     libfuncVal;
+        double        numVal;
+        char*         strVal;
+        unsigned char boolVal;
+        avm_table*    tableVal;
+        unsigned      funcVal;
+        char*         libfuncVal;
     } data;
 };
 
-//––– Hash‐table for “table_m” –––––––––––––––––––––––––––––––––––––––––––––
+extern avm_memcell stack[AVM_STACKSIZE];
+
+void avm_initstack(void);
 
 struct avm_table_bucket {
-    avm_memcell*          key;
-    avm_memcell*          value;
-    avm_table_bucket*     next;
+    avm_memcell*       key;
+    avm_memcell*       value;
+    avm_table_bucket*  next;
 };
 
 struct avm_table {
-    unsigned              refCounter;
-    avm_table_bucket*     numIndexed[AVM_TABLE_HASHSIZE];
-    avm_table_bucket*     strIndexed[AVM_TABLE_HASHSIZE];
-    unsigned              total;
+    unsigned             refCounter;
+    avm_table_bucket*    strIndexed[AVM_TABLE_HASHSIZE];
+    avm_table_bucket*    numIndexed[AVM_TABLE_HASHSIZE];
+    unsigned             total;
 };
 
-//––– Public AVM API –––––––––––––––––––––––––––––––––––––––––––––––––––––––
-
-/* Clear any dynamic contents of a memcell (string/table) and reset to undef */
-void         avm_memcellclear(avm_memcell* m);
-
-/* Create/destroy a table; simple ref‐count GC on tables */
 avm_table*   avm_tablenew(void);
-void         avm_tabledestroy(avm_table* t);
-void         avm_tableincrefcounter(avm_table* t);
-void         avm_tabledecrefcounter(avm_table* t);
-
-/* Lookup or set an element in a table (numeric or string key only) */
 avm_memcell* avm_tablegetelem(avm_table* t, avm_memcell* key);
 void         avm_tablesetelem(avm_table* t, avm_memcell* key, avm_memcell* value);
+void         avm_tableincrefcounter(avm_table* t);
+void         avm_tabledecrefcounter(avm_table* t);
+void         avm_tablebucketsinit(avm_table_bucket** p);
+void         avm_tablebucketsdestroy(avm_table_bucket** p);
+void         avm_tabledestroy(avm_table* t);
+void         avm_memcellclear(avm_memcell& m);
+avm_memcell* avm_translate_operand(vmarg* arg, avm_memcell* reg);
+
+double consts_getnumber(unsigned index);
+std::string  consts_getstring(unsigned index);
+std::string  libfuncs_getused(unsigned index);
+userfunc userfuncs_getfunc(unsigned index);
 
 
-// reverse‐lookup for constants
-double consts_getnumber   (unsigned index);
-char*  consts_getstring   (unsigned index);
-char*  libfuncs_getused   (unsigned index);
+#define AVM_MAX_INSTRUCTIONS (unsigned) nop_v
 
-//––– execution dispatch table and cycle ––––––––––––––––––––––––––––––––––––
+void execute_assign(instruction*);
+void execute_add(instruction*);
+void execute_sub(instruction*);
+void execute_mul(instruction*);
+void execute_div(instruction*);
+void execute_mod(instruction*);
 
-typedef void (*execute_func_t)(instruction*);
-
-#define AVM_MAX_INSTRUCTIONS  (unsigned) nop_v
-
-extern execute_func_t executeFuncs[];
-
-extern void execute_assign      (instruction*);
-extern void execute_add         (instruction*);
-extern void execute_sub         (instruction*);
-extern void execute_mul         (instruction*);
-extern void execute_div         (instruction*);
-extern void execute_mod         (instruction*);
-
-extern void execute_jeq         (instruction*);
-extern void execute_jne         (instruction*);
-extern void execute_jle         (instruction*);
-extern void execute_jge         (instruction*);
-extern void execute_jlt         (instruction*);
-extern void execute_jgt         (instruction*);
-extern void execute_jump        (instruction*);
-
-extern void execute_call        (instruction*);
-extern void execute_pusharg     (instruction*);
-extern void execute_funcenter   (instruction*);
-extern void execute_funcexit    (instruction*);
-extern void execute_newtable    (instruction*);
-extern void execute_tablegetelem(instruction*);
-extern void execute_tablesetelem(instruction*);
-extern void execute_getretval   (instruction*);
-extern void execute_nop         (instruction*);
-
-extern void execute_cycle(void);
+void execute_uminus(instruction*);
+void execute_and(instruction*);
+void execute_or(instruction*);
+void execute_not(instruction*);
 
 
-#endif // AVM_HPP
+void execute_jeq(instruction*);
+void execute_jne(instruction*);
+void execute_jle(instruction*);
+void execute_jge(instruction*);
+void execute_jlt(instruction*);
+void execute_jgt(instruction*);
+
+void execute_call(instruction*);
+void execute_pusharg(instruction*);
+void execute_funcenter(instruction*);
+void execute_funcexit(instruction*);
+
+void execute_newtable(instruction*);
+void execute_tablegetelem(instruction*);
+void execute_tablesetelem(instruction*);
+
+void execute_jump(instruction*);
+void execute_ret(instruction*);
+void execute_nop(instruction*);
+void execute_getretval(instruction*);
+
+void execute_cycle();
+
+void avm_warning(const char* format, ...);
+void avm_assign(avm_memcell* lv, avm_memcell* rv);
+
+void avm_error(const char* format, ...);
+std::string avm_tostring(avm_memcell* m);
+void avm_calllibfunc(const char* funcName);
+void avm_callsaveenv(void);
+
+userfunc* avm_getfuncinfo(unsigned address);
+
+void avm_dec_top();
+void avm_push_envvalue(unsigned val);
+void readBinary(const char* fileName);
+
+char* avm_to_string(const avm_memcell* m);
+
+void libfunc_print(void);
+void libfunc_typeof(void);
+
+
+
+
+
+#endif // _AVM_HPP

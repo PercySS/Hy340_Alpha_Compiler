@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <fstream>
 
+#define MAGIC_NUMBER 0xDEADBEEF
 
 enum vmopcode {
     assign_v, add_v, sub_v, mul_v, div_v, mod_v,
@@ -89,7 +90,6 @@ void generate_getelem(quad* quad);
 void generate_setelem(quad* quad);
 void generate_assign(quad* quad);
 void generate_nop();
-void generate_uminus(quad* quad);
 
 void generate_relational(vmopcode op, quad* quad);
 void generate_jump(quad* quad);
@@ -100,9 +100,6 @@ void generate_ifge(quad* quad);
 void generate_iflt(quad* quad);
 void generate_ifgt(quad* quad);
 
-void generate_not(quad* quad);
-void generate_or(quad* quad);
-void generate_and(quad* quad);
 
 void generate_param(quad* quad);
 void generate_call(quad* quad);
